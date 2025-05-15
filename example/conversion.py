@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from power_grid_model import CalculationMethod, PowerGridModel
 from power_grid_model_io.converters.pgm_json_converter import PgmJsonConverter
 
 from cgmes2pgm_converter import CgmesDataset, CgmesToPgmConverter, ConverterOptions
@@ -39,14 +38,3 @@ input_data, extra_info = converter.convert()
 
 converter = PgmJsonConverter(destination_file="../out/input.json")
 converter.save(input_data, extra_info)
-
-pgm = PowerGridModel(input_data)
-
-result = pgm.calculate_state_estimation(
-    calculation_method=CalculationMethod.newton_raphson,
-    error_tolerance=1e-6,
-    max_iterations=10,
-)
-
-converter = PgmJsonConverter(destination_file="../out/output.json")
-converter.save(result)
