@@ -19,6 +19,12 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class SourceBuilder(AbstractPgmComponentBuilder):
+    """
+    This builder converts the SynchronousMachine or ExternalNetworkInjection
+    with the lowest reference priority != 0 to a Source component.
+
+    One sym_gen component is removed and an source component is created
+    """
 
     def is_active(self):
         return not self._converter_options.sources_from_sv
@@ -43,6 +49,8 @@ class SourceBuilder(AbstractPgmComponentBuilder):
         sources["rx_ratio"] = 0.1
         sources["z01_ratio"] = 1
 
+        # extra info are adopted from the generator/networkinjection,
+        # as the same pgm_id is used
         extra_info = {}
         return sources, extra_info
 

@@ -21,7 +21,7 @@ from ..component import AbstractPgmComponentBuilder
 class SymLoadBuilder(AbstractPgmComponentBuilder):
 
     _query = """
-        SELECT DISTINCT ?topologicalNode ?name ?connected ?EnergyConsumer ?p ?q ?type
+        SELECT DISTINCT ?topologicalNode ?name ?connected ?EnergyConsumer ?p ?q ?type ?terminal
         WHERE
         {
             ?EnergyConsumer rdf:type ?_type;
@@ -39,7 +39,7 @@ class SymLoadBuilder(AbstractPgmComponentBuilder):
 
             BIND(STRAFTER(STR(?_type), "#") AS ?type)
 
-            ?Terminal a cim:Terminal;
+            ?terminal a cim:Terminal;
                         cim:Terminal.TopologicalNode ?topologicalNode;
                         cim:ACDCTerminal.connected ?connected;
                         cim:Terminal.ConductingEquipment ?EnergyConsumer.
@@ -81,6 +81,9 @@ class SymLoadBuilder(AbstractPgmComponentBuilder):
         extra_info = self._create_extra_info_with_types(arr, res["type"])
 
         self._log_type_counts(extra_info)
+
+        for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_terminal"] = res["terminal"][i]
 
         return arr, extra_info
 

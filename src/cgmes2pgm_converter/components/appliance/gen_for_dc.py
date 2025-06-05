@@ -69,6 +69,9 @@ class DcAsLoadBuilder(AbstractPgmComponentBuilder):
 
         extra_info = self._create_extra_info_with_types(arr, res["type"] + "AsLoad")
 
+        for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_terminal"] = res["terminal"][i]
+
         return arr, extra_info
 
     def component_name(self) -> ComponentType:

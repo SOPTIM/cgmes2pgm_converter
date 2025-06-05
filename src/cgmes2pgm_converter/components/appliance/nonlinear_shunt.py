@@ -23,12 +23,13 @@ class NonLinearShuntBuilder(AbstractPgmComponentBuilder):
         SELECT  (SAMPLE(?_name) as ?name)
                 (SAMPLE(?_topologicalNode) as ?topologicalNode)
                 (SAMPLE(?_connected) as ?connected)
+                (SAMPLE(?_Terminal) as ?terminal)
                 ?ShuntCompensator
                 (SUM(xsd:double(?_b)) as ?b)
                 (SUM(xsd:double(?_g)) as ?g)
                 (SAMPLE(xsd:float(?_sections)) as ?sections)
         WHERE {
-            ?Terminal a cim:Terminal;
+            ?_Terminal a cim:Terminal;
                         cim:Terminal.TopologicalNode ?_topologicalNode;
                         cim:ACDCTerminal.connected ?_connected;
                         cim:Terminal.ConductingEquipment ?ShuntCompensator.
@@ -76,6 +77,9 @@ class NonLinearShuntBuilder(AbstractPgmComponentBuilder):
         arr["g1"] = res["g"]
 
         extra_info = self._create_extra_info_with_type(arr, "NonlinearShuntCompensator")
+
+        for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_terminal"] = res["terminal"][i]
 
         self._log_type_counts(extra_info)
 

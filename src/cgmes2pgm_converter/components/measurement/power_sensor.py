@@ -404,7 +404,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
         for appl_idx, appl in appl_extras:
             # get the branch that was replaced by the source/generation
-            branch_id = appl["branch"]
+            branch_id = appl["_branch"]
             branch = id_map[branch_id]
 
             # get the nodes of the branch
