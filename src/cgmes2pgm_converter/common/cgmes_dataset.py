@@ -72,7 +72,9 @@ class CgmesDataset(SparqlDataSource):
         mrid = mrid.replace('"', "")
         return f"<{self.base_url}/data#_{mrid}>"
 
-    def insert_df(self, df: pd.DataFrame, profile: Profile, include_mrid=True) -> None:
+    def insert_df(
+        self, df: pd.DataFrame, profile: Profile | str, include_mrid=True
+    ) -> None:
         """Insert a DataFrame into the specified profile.
         The DataFrame must have a column "IdentifiedObject.mRID"
         The column names are used as predicates in the RDF triples.
@@ -80,14 +82,15 @@ class CgmesDataset(SparqlDataSource):
 
         Args:
             df (pd.DataFrame): The DataFrame to insert
-            profile (Profile): The profile to insert the data into
+            profile (Profile | str): The profile/uri to insert the DataFrame into.
             include_mrid (bool, optional): Include the mRID in the triples. Defaults to True.
         """
+        profile_uri = self.graphs[profile] if isinstance(profile, Profile) else profile
 
         logging.debug(
             "Inserting %s triples into %s",
             df.shape[0] * df.shape[1],
-            self.graphs[profile],
+            profile_uri,
         )
 
         # Split Dataframe if it has more than MAX_TRIPLES_PER_INSERT rows
@@ -96,17 +99,17 @@ class CgmesDataset(SparqlDataSource):
             for i in range(num_chunks):
                 self._insert_df(
                     df.iloc[i * MAX_ROWS_PER_INSERT : (i + 1) * MAX_ROWS_PER_INSERT],
-                    self.graphs[profile],
+                    profile_uri,
                     include_mrid,
                 )
             if df.shape[0] % MAX_ROWS_PER_INSERT != 0:
                 self._insert_df(
                     df.iloc[num_chunks * MAX_ROWS_PER_INSERT :],
-                    self.graphs[profile],
+                    profile_uri,
                     include_mrid,
                 )
         else:
-            self._insert_df(df, self.graphs[profile], include_mrid)
+            self._insert_df(df, profile_uri, include_mrid)
 
     def _insert_df(self, df: pd.DataFrame, graph: str, include_mrid):
 
@@ -124,6 +127,27 @@ class CgmesDataset(SparqlDataSource):
             INSERT DATA {{
                 GRAPH <{graph}> {{
                     {"".join(triples)}
+                }}
+            }}
+        """
+        self.update(insert_query, add_prefixes=False)
+
+    def insert_triples(self, triples: list[tuple[str, str, str]], graph: str):
+        """Insert a list of RDF triples into the dataset.
+        Args:
+            triples (list[str]): A list of RDF triples in the format "subject predicate object".
+        """
+
+        triples_str = []
+
+        for subject, predicate, obj in triples:
+            triples_str.append(f"{subject} {predicate} {obj}.")
+
+        insert_query = f"""
+            {self._prefixes}
+            INSERT DATA {{
+                GRAPH <{graph}> {{
+                    {"\n\t\t".join(triples_str)}
                 }}
             }}
         """
