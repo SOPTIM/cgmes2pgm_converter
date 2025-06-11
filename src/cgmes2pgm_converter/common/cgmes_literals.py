@@ -32,22 +32,22 @@ def phase_tap_changer_types(cim_namespace: str):
     ]
 
 
-class Profile(Enum):
+class Profile(StrEnum):
     """Enumeration for the CGMES-profile types."""
 
-    EQ = 0
+    EQ = auto()
     """Equipment profile"""
 
-    SSH = 1
+    SSH = auto()
     """Steady state hypothesis profile"""
 
-    OP = 2
+    OP = auto()
     """Operational profile"""
 
-    SV = 3
+    SV = auto()
     """State estimation profile"""
 
-    MEAS = 4
+    MEAS = auto()
     """Measurement profile"""
 
 
