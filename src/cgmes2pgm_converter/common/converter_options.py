@@ -54,10 +54,10 @@ class ConverterOptions:
     only_topo_island: bool = False
     topo_island_name: str | None = None
     sources_from_sv: bool = False
-    measurement_substitution: MeasurementSubstitutionOptions | None = field(
+    measurement_substitution: MeasurementSubstitutionOptions = field(
         default_factory=MeasurementSubstitutionOptions
     )
-    network_splitting: NetworkSplittingOptions | None = field(
+    network_splitting: NetworkSplittingOptions = field(
         default_factory=NetworkSplittingOptions
     )
 

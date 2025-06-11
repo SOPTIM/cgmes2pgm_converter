@@ -565,7 +565,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
     def _get_one_measurement_and_sigma(
         self, meas_pq, nomv
-    ) -> tuple[float | None, float | None, str | None, str | None, bool, float]:
+    ) -> tuple[float | None, float | None, str | None, str | None, bool]:
         has_sigma = (
             any(not np.isnan(m["sigma"]) for m in meas_pq)
             if meas_pq is not None
