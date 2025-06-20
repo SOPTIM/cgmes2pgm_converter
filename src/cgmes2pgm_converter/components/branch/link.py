@@ -26,6 +26,8 @@ class LinkBuilder(AbstractPgmComponentBuilder):
                 (SAMPLE(?_tn2) as ?tn2)
                 (SAMPLE(?_status1) as ?status1)
                 (SAMPLE(?_status2) as ?status2)
+                (SAMPLE(?_term1) as ?term1)
+                (SAMPLE(?_term2) as ?term2)
                 (SAMPLE(?_open) as ?open)
                 (SAMPLE(?__type) as ?type)
         WHERE {
@@ -80,6 +82,10 @@ class LinkBuilder(AbstractPgmComponentBuilder):
         arr["to_status"] = res["status2"] & ~res["open"]
 
         extra_info = self._create_extra_info_with_types(arr, res["type"])
+
+        for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_term1"] = res["term1"][i]
+            extra_info[pgm_id]["_term2"] = res["term2"][i]
 
         self._log_type_counts(extra_info)
 

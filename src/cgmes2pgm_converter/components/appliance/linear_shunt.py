@@ -20,7 +20,7 @@ from ..component import AbstractPgmComponentBuilder
 
 class LinearShuntBuilder(AbstractPgmComponentBuilder):
     _query = """
-        SELECT ?name ?topologicalNode ?connected ?ShuntCompensator ?b ?g (xsd:float(?_sections) as ?sections)
+        SELECT ?name ?topologicalNode ?connected ?ShuntCompensator ?b ?g (xsd:float(?_sections) as ?sections) ?Terminal
         WHERE {
             ?Terminal a cim:Terminal ;
                     cim:Terminal.TopologicalNode ?topologicalNode;
@@ -65,6 +65,9 @@ class LinearShuntBuilder(AbstractPgmComponentBuilder):
         arr["g1"] = res["g"]
 
         extra_info = self._create_extra_info_with_type(arr, "LinearShuntCompensator")
+
+        for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_terminal"] = res["Terminal"][i]
 
         self._log_type_counts(extra_info)
 

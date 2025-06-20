@@ -81,6 +81,9 @@ class Topology:
         if eval_measurements:
             self._eval_measurements()
 
+        if self._result_data is not None:
+            self.add_results(self._result_data)
+
     def _add_nodes(self):
         topology = self._topology
         nodes = self._input_data[ComponentType.node]

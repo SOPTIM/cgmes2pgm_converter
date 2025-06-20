@@ -180,7 +180,8 @@ class NetworkSplitter(AbstractPgmComponentBuilder):
 
                 extra_info[src_id] = {
                     "_type": "SubstationLineAsSource",
-                    "branch": brid,
+                    "_branch": brid,
+                    "_terminal": term_iri,
                 }
 
         arr["id"] = ids

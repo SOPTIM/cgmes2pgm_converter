@@ -404,7 +404,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
         for appl_idx, appl in appl_extras:
             # get the branch that was replaced by the source/generation
-            branch_id = appl["branch"]
+            branch_id = appl["_branch"]
             branch = id_map[branch_id]
 
             # get the nodes of the branch
@@ -565,7 +565,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
     def _get_one_measurement_and_sigma(
         self, meas_pq, nomv
-    ) -> tuple[float | None, float | None, str | None, str | None, bool, float]:
+    ) -> tuple[float | None, float | None, str | None, str | None, bool]:
         has_sigma = (
             any(not np.isnan(m["sigma"]) for m in meas_pq)
             if meas_pq is not None

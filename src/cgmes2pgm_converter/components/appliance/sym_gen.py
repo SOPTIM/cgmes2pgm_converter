@@ -22,9 +22,9 @@ from ..component import AbstractPgmComponentBuilder
 
 class SymGenBuilder(AbstractPgmComponentBuilder):
     _query = """
-        SELECT ?name ?topologicalNode ?connected ?EnergyProducer ?p ?q ?targetVoltage ?valMultiplier ?type
+        SELECT ?name ?topologicalNode ?connected ?EnergyProducer ?p ?q ?targetVoltage ?valMultiplier ?type ?terminal
         WHERE {
-            ?Terminal a cim:Terminal;
+            ?terminal a cim:Terminal;
                         cim:Terminal.TopologicalNode ?topologicalNode;
                         cim:ACDCTerminal.connected ?connected;
                         cim:Terminal.ConductingEquipment ?EnergyProducer.
@@ -50,7 +50,7 @@ class SymGenBuilder(AbstractPgmComponentBuilder):
 
             OPTIONAL {
                 ?RegC a cim:RegulatingControl;
-                        cim:RegulatingControl.Terminal ?Terminal;
+                        cim:RegulatingControl.Terminal ?terminal;
                         cim:RegulatingControl.mode <cim:RegulatingControlModeKind.voltage>;
                         cim:RegulatingControl.targetValue ?targetVoltage;
                         cim:RegulatingControl.targetValueUnitMultiplier ?valMultiplier.
@@ -100,6 +100,8 @@ class SymGenBuilder(AbstractPgmComponentBuilder):
         extra_info = self._create_extra_info_with_types(arr, res["type"])
 
         for i, pgm_id in enumerate(arr["id"]):
+            extra_info[pgm_id]["_terminal"] = res["terminal"][i]
+
             if not np.isnan(res["targetVoltage"][i]):
                 info = extra_info.setdefault(pgm_id, {})
                 info["_targetVoltage"] = res["targetVoltage"][
