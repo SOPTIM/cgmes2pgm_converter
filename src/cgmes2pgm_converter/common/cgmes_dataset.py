@@ -37,11 +37,11 @@ class CgmesDataset(SparqlDataSource):
     using SPARQL queries. It provides functionality to handle RDF graphs, insert data from pandas
     DataFrames, and manage profiles within the CGMES dataset.
     Attributes:
-        base_url (str): The base URL used to construct URIs for RDF triples.
-        cim_namespace (str): The namespace for CIM (Common Information Model) elements.
+        base_url (str): The base URL used to construct URIs for RDF triples
+        cim_namespace (str): The namespace for CIM (Common Information Model) elements
             - CGMES 2: "http://iec.ch/TC57/2013/CIM-schema-cim16#"
             - CGMES 3: "http://iec.ch/TC57/CIM100#"
-        graphs (dict[Profile, str]): A dictionary mapping profiles to their RDF graph URIs.
+        graphs (dict[Profile, str]): A dictionary mapping profiles to their RDF graph URIs
     """
 
     def __init__(
