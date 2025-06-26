@@ -21,13 +21,14 @@ from .cgmes_literals import CIM_ID_OBJ, Profile
 from .sparql_datasource import SparqlDataSource
 
 MAX_ROWS_PER_INSERT = 10000
-RDF_PREFIXES = """
-        PREFIX cim:    <%s>
-        PREFIX rdfs:   <http://www.w3.org/2000/01/rdf-schema#>
-        PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
-        PREFIX md:     <http://iec.ch/TC57/61970-552/ModelDescription/1#>
-    """
+
+RDF_PREFIXES = {
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "md": "http://iec.ch/TC57/61970-552/ModelDescription/1#",
+    "dm": "http://iec.ch/TC57/61970-552/DifferenceModel/1#",
+}
 
 
 class CgmesDataset(SparqlDataSource):
@@ -47,9 +48,12 @@ class CgmesDataset(SparqlDataSource):
         self,
         base_url: str,
         cim_namespace: str,
-        graphs: dict[Profile, str] = None,
+        graphs: dict[Profile, str] | None = None,
     ):
-        super().__init__(base_url, RDF_PREFIXES % cim_namespace)
+        rdf_prefixes = RDF_PREFIXES.copy()
+        rdf_prefixes["cim"] = cim_namespace
+
+        super().__init__(base_url, rdf_prefixes)
         self.base_url = base_url
         self.graphs = graphs or {}
         self.cim_namespace = cim_namespace
@@ -123,14 +127,13 @@ class CgmesDataset(SparqlDataSource):
             triples += [f"{uri} {col} {row}." for uri, row in zip(uris, df[col])]
 
         insert_query = f"""
-            {self._prefixes}
             INSERT DATA {{
                 GRAPH <{graph}> {{
                     {"".join(triples)}
                 }}
             }}
         """
-        self.update(insert_query, add_prefixes=False)
+        self.update(insert_query)
 
     def insert_triples(self, triples: list[tuple[str, str, str]], graph: str):
         """Insert a list of RDF triples into the dataset.
@@ -144,11 +147,10 @@ class CgmesDataset(SparqlDataSource):
             triples_str.append(f"{subject} {predicate} {obj}.")
 
         insert_query = f"""
-            {self._prefixes}
             INSERT DATA {{
                 GRAPH <{graph}> {{
                     {"\n\t\t".join(triples_str)}
                 }}
             }}
         """
-        self.update(insert_query, add_prefixes=False)
+        self.update(insert_query)

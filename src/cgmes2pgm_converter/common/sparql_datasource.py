@@ -23,7 +23,7 @@ from .timer import Timer
 
 class AbstractSparqlDataSource:
 
-    def __init__(self, base_url, prefixes: str):
+    def __init__(self, base_url, prefixes: dict[str, str]):
         self._base_url = base_url
         self._prefixes = prefixes
 
@@ -45,7 +45,7 @@ class SparqlDataSource(AbstractSparqlDataSource):
     def __init__(
         self,
         base_url,
-        prefixes: str,
+        prefixes: dict[str, str],
         query_endpoint="/query",
         update_endpoint="/update",
     ):
@@ -56,6 +56,16 @@ class SparqlDataSource(AbstractSparqlDataSource):
         )
         self._query_wrapper.addCustomHttpHeader("Accept", "text/csv")
         self._query_wrapper.setOnlyConneg(True)
+
+    def get_prefixes(self) -> dict[str, str]:
+        return self._prefixes
+
+    def _build_prefixes(self) -> str:
+        """Builds a string of SPARQL prefixes from the provided dictionary"""
+        prefix_str = ""
+        for prefix, uri in self._prefixes.items():
+            prefix_str += f"PREFIX {prefix}: <{uri}>\n"
+        return prefix_str + "\n"
 
     def query(self, query: str, add_prefixes=True) -> pd.DataFrame:
         """Executes a SPARQL query and returns the result as a pandas DataFrame
@@ -70,7 +80,7 @@ class SparqlDataSource(AbstractSparqlDataSource):
         """
 
         if add_prefixes:
-            self._query_wrapper.setQuery(self._prefixes + query)
+            self._query_wrapper.setQuery(self._build_prefixes() + query)
         else:
             self._query_wrapper.setQuery(query)
 
@@ -91,7 +101,7 @@ class SparqlDataSource(AbstractSparqlDataSource):
         """
 
         if add_prefixes:
-            self._query_wrapper.setQuery(self._prefixes + query)
+            self._query_wrapper.setQuery(self._build_prefixes() + query)
         else:
             self._query_wrapper.setQuery(query)
 
