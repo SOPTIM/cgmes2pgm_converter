@@ -86,10 +86,10 @@ class CgmesDataset(SparqlDataSource):
 
         Args:
             df (pd.DataFrame): The DataFrame to insert
-            profile (Profile | str): The profile/uri to insert the DataFrame into.
+            profile (Profile | str): The profile or URI of the graph to insert the DataFrame into.
             include_mrid (bool, optional): Include the mRID in the triples. Defaults to True.
         """
-        profile_uri = self.graphs[profile] if isinstance(profile, Profile) else profile
+        profile_uri = self._get_profile_uri(profile)
 
         logging.debug(
             "Inserting %s triples into %s",
@@ -135,12 +135,15 @@ class CgmesDataset(SparqlDataSource):
         """
         self.update(insert_query)
 
-    def insert_triples(self, triples: list[tuple[str, str, str]], graph: str):
+    def insert_triples(
+        self, triples: list[tuple[str, str, str]], profile: Profile | str
+    ):
         """Insert a list of RDF triples into the dataset.
         Args:
             triples (list[str]): A list of RDF triples in the format "subject predicate object".
+            profile (Profile | str): The profile or URI of the graph to insert the triples into.
         """
-
+        profile_uri = self._get_profile_uri(profile)
         triples_str = []
 
         for subject, predicate, obj in triples:
@@ -148,9 +151,12 @@ class CgmesDataset(SparqlDataSource):
 
         insert_query = f"""
             INSERT DATA {{
-                GRAPH <{graph}> {{
+                GRAPH <{profile_uri}> {{
                     {"\n\t\t".join(triples_str)}
                 }}
             }}
         """
         self.update(insert_query)
+
+    def _get_profile_uri(self, profile: Profile | str) -> str:
+        return self.graphs[profile] if isinstance(profile, Profile) else profile
