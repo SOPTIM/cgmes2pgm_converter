@@ -33,7 +33,7 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     _query_meas_in_graph = """
         SELECT ?eq ?tn ?term ?max_u ?min_u ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
-            GRAPH ?g_v {
+            GRAPH <$OP_GRAPH> {
                 ?meas_u cim:Measurement.measurementType ?type_u;
                         cim:IdentifiedObject.name ?name;
                         cim:Measurement.PowerSystemResource ?eq;
@@ -50,7 +50,7 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
 
             ?term cim:Terminal.TopologicalNode ?tn.
 
-            GRAPH ?g_v_val {
+            GRAPH <$MEAS_GRAPH> {
                 ?measVal_v cim:AnalogValue.value ?u.
             }
 
@@ -140,7 +140,11 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         return arr, extra_info
 
     def _read_meas_from_graph(self):
-        args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
+        args = {
+            "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
+            "$OP_GRAPH": self._source.graphs[Profile.OP],
+            "$MEAS_GRAPH": self._source.graphs[Profile.MEAS],
+        }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
         res["meas_type"] = VoltageMeasType.FIELD
