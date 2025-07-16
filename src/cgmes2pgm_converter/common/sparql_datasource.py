@@ -95,7 +95,12 @@ class SparqlDataSource(AbstractSparqlDataSource):
             graph_iri (str): The IRI of the graph to drop
         """
 
-        self.update(f"DROP GRAPH <{graph_iri}>")
+        if graph_iri == "default":
+            q = "DROP DEFAULT"
+        else:
+            q = f"DROP GRAPH <{graph_iri}>"
+
+        self.update(q)
 
     def format_query(self, string: str, query_params: dict):
         for a, b in query_params.items():
