@@ -21,6 +21,7 @@ from .cgmes_literals import CIM_ID_OBJ, Profile
 from .sparql_datasource import SparqlDataSource
 
 MAX_ROWS_PER_INSERT = 10000
+MAX_TRIPLES_PER_INSERT = 10000
 
 RDF_PREFIXES = {
     "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
@@ -69,7 +70,7 @@ class CgmesDataset(SparqlDataSource):
 
     def drop_profile(self, profile: Profile) -> None:
         """Drop the RDF graph associated with the specified profile."""
-        self.drop_graph(self.graphs[profile])
+        self.drop_graph(self._get_profile_uri(profile))
 
     def mrid_to_uri(self, mrid: str) -> str:
         """Convert an mRID (Master Resource Identifier) to a URI format."""
@@ -97,18 +98,20 @@ class CgmesDataset(SparqlDataSource):
             profile_uri,
         )
 
+        max_rows_per_insert = MAX_TRIPLES_PER_INSERT // df.shape[1]
+
         # Split Dataframe if it has more than MAX_TRIPLES_PER_INSERT rows
-        if df.shape[0] > MAX_ROWS_PER_INSERT:
-            num_chunks = df.shape[0] // MAX_ROWS_PER_INSERT
+        if df.shape[0] > max_rows_per_insert:
+            num_chunks = df.shape[0] // max_rows_per_insert
             for i in range(num_chunks):
                 self._insert_df(
-                    df.iloc[i * MAX_ROWS_PER_INSERT : (i + 1) * MAX_ROWS_PER_INSERT],
+                    df.iloc[i * max_rows_per_insert : (i + 1) * max_rows_per_insert],
                     profile_uri,
                     include_mrid,
                 )
-            if df.shape[0] % MAX_ROWS_PER_INSERT != 0:
+            if df.shape[0] % max_rows_per_insert != 0:
                 self._insert_df(
-                    df.iloc[num_chunks * MAX_ROWS_PER_INSERT :],
+                    df.iloc[num_chunks * max_rows_per_insert :],
                     profile_uri,
                     include_mrid,
                 )
@@ -143,19 +146,48 @@ class CgmesDataset(SparqlDataSource):
             triples (list[str]): A list of RDF triples in the format "subject predicate object".
             profile (Profile | str): The profile or URI of the graph to insert the triples into.
         """
+
+        # Split triples if they exceed MAX_TRIPLES_PER_INSERT
+        if len(triples) > MAX_TRIPLES_PER_INSERT:
+            num_chunks = len(triples) // MAX_TRIPLES_PER_INSERT
+            for i in range(num_chunks):
+                self._insert_triples(
+                    triples[
+                        i * MAX_TRIPLES_PER_INSERT : (i + 1) * MAX_TRIPLES_PER_INSERT
+                    ],
+                    profile,
+                )
+            if len(triples) % MAX_TRIPLES_PER_INSERT != 0:
+                self._insert_triples(
+                    triples[num_chunks * MAX_TRIPLES_PER_INSERT :], profile
+                )
+        else:
+            self._insert_triples(triples, profile)
+
+    def _insert_triples(
+        self, triples: list[tuple[str, str, str]], profile: Profile | str
+    ):
+
         profile_uri = self._get_profile_uri(profile)
         triples_str = []
 
         for subject, predicate, obj in triples:
             triples_str.append(f"{subject} {predicate} {obj}.")
 
-        insert_query = f"""
+        if profile_uri == "default":
+            insert_query = f"""
             INSERT DATA {{
-                GRAPH <{profile_uri}> {{
                     {"\n\t\t".join(triples_str)}
-                }}
             }}
         """
+        else:
+            insert_query = f"""
+                INSERT DATA {{
+                    GRAPH <{profile_uri}> {{
+                        {"\n\t\t".join(triples_str)}
+                    }}
+                }}
+            """
         self.update(insert_query)
 
     def _get_profile_uri(self, profile: Profile | str) -> str:
