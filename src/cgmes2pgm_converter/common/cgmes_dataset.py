@@ -38,7 +38,7 @@ class CgmesDataset(SparqlDataSource):
     using SPARQL queries. It provides functionality to handle RDF graphs, insert data from pandas
     DataFrames, and manage profiles within the CGMES dataset.
     Attributes:
-        base_url (str): The base URL used to construct URIs for RDF triples
+        base_url (str): The base URL of the dataset
         cim_namespace (str): The namespace for CIM (Common Information Model) elements
             - CGMES 2: "http://iec.ch/TC57/2013/CIM-schema-cim16#"
             - CGMES 3: "http://iec.ch/TC57/CIM100#"
@@ -72,10 +72,10 @@ class CgmesDataset(SparqlDataSource):
         """Drop the RDF graph associated with the specified profile."""
         self.drop_graph(self._get_profile_uri(profile))
 
-    def mrid_to_uri(self, mrid: str) -> str:
-        """Convert an mRID (Master Resource Identifier) to a URI format."""
+    def mrid_to_urn(self, mrid: str) -> str:
+        """Convert an mRID (Master Resource Identifier) to its iri in the dataset."""
         mrid = mrid.replace('"', "")
-        return f"<{self.base_url}/data#_{mrid}>"
+        return f"<urn:uuid:{mrid}>"
 
     def insert_df(
         self, df: pd.DataFrame, profile: Profile | str, include_mrid=True
@@ -120,7 +120,7 @@ class CgmesDataset(SparqlDataSource):
 
     def _insert_df(self, df: pd.DataFrame, graph: str, include_mrid):
 
-        uris = [self.mrid_to_uri(row) for row in df[f"{CIM_ID_OBJ}.mRID"]]
+        uris = [self.mrid_to_urn(row) for row in df[f"{CIM_ID_OBJ}.mRID"]]
         triples = []
         for col in df.columns:
 
