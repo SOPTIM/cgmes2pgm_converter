@@ -20,7 +20,6 @@ import pandas as pd
 from .cgmes_literals import CIM_ID_OBJ, Profile
 from .sparql_datasource import SparqlDataSource
 
-MAX_ROWS_PER_INSERT = 10000
 MAX_TRIPLES_PER_INSERT = 10000
 
 RDF_PREFIXES = {
@@ -83,7 +82,7 @@ class CgmesDataset(SparqlDataSource):
         """Insert a DataFrame into the specified profile.
         The DataFrame must have a column "IdentifiedObject.mRID"
         The column names are used as predicates in the RDF triples.
-        Maximum number of rows per INSERT-Statement is defined by MAX_ROWS_PER_INSERT
+        Maximum number of rows per INSERT-Statement is defined by MAX_TRIPLES_PER_INSERT
 
         Args:
             df (pd.DataFrame): The DataFrame to insert
