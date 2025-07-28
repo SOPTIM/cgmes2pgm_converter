@@ -24,7 +24,10 @@ dynamic = ["dependencies"]
 [project.optional-dependencies]
 dev = [
     "black>=24.10.0",
+    "build>=1.2.0",
     "isort>=6.0.1",
+    "pre_commit>=4.0.0",
+    "twine>=6.1.0",
 ]
 
 [project.urls]
