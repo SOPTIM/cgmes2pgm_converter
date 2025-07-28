@@ -13,14 +13,19 @@ license-files = ["LICENSE"]
 keywords = ["cgmes", "pgm", "State Estimation", "Power Grid Model"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
 ]
 
-requires-python = ">=3.10.12"
+requires-python = ">=3.12.3"
 dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.10.0",
+    "isort>=6.0.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/SOPTIM/cgmes2pgm_converter"
