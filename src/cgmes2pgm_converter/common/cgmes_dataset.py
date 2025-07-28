@@ -21,13 +21,15 @@ from .cgmes_literals import CIM_ID_OBJ, Profile
 from .sparql_datasource import SparqlDataSource
 
 MAX_ROWS_PER_INSERT = 10000
-RDF_PREFIXES = """
-        PREFIX cim:    <%s>
-        PREFIX rdfs:   <http://www.w3.org/2000/01/rdf-schema#>
-        PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
-        PREFIX md:     <http://iec.ch/TC57/61970-552/ModelDescription/1#>
-    """
+MAX_TRIPLES_PER_INSERT = 10000
+
+RDF_PREFIXES = {
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "md": "http://iec.ch/TC57/61970-552/ModelDescription/1#",
+    "dm": "http://iec.ch/TC57/61970-552/DifferenceModel/1#",
+}
 
 
 class CgmesDataset(SparqlDataSource):
@@ -36,20 +38,23 @@ class CgmesDataset(SparqlDataSource):
     using SPARQL queries. It provides functionality to handle RDF graphs, insert data from pandas
     DataFrames, and manage profiles within the CGMES dataset.
     Attributes:
-        base_url (str): The base URL used to construct URIs for RDF triples.
-        cim_namespace (str): The namespace for CIM (Common Information Model) elements.
+        base_url (str): The base URL used to construct URIs for RDF triples
+        cim_namespace (str): The namespace for CIM (Common Information Model) elements
             - CGMES 2: "http://iec.ch/TC57/2013/CIM-schema-cim16#"
             - CGMES 3: "http://iec.ch/TC57/CIM100#"
-        graphs (dict[Profile, str]): A dictionary mapping profiles to their RDF graph URIs.
+        graphs (dict[Profile, str]): A dictionary mapping profiles to their RDF graph URIs
     """
 
     def __init__(
         self,
         base_url: str,
         cim_namespace: str,
-        graphs: dict[Profile, str] = None,
+        graphs: dict[Profile, str] | None = None,
     ):
-        super().__init__(base_url, RDF_PREFIXES % cim_namespace)
+        rdf_prefixes = RDF_PREFIXES.copy()
+        rdf_prefixes["cim"] = cim_namespace
+
+        super().__init__(base_url, rdf_prefixes)
         self.base_url = base_url
         self.graphs = graphs or {}
         self.cim_namespace = cim_namespace
@@ -65,7 +70,7 @@ class CgmesDataset(SparqlDataSource):
 
     def drop_profile(self, profile: Profile) -> None:
         """Drop the RDF graph associated with the specified profile."""
-        self.drop_graph(self.graphs[profile])
+        self.drop_graph(self._get_profile_uri(profile))
 
     def mrid_to_uri(self, mrid: str) -> str:
         """Convert an mRID (Master Resource Identifier) to a URI format."""
@@ -82,10 +87,10 @@ class CgmesDataset(SparqlDataSource):
 
         Args:
             df (pd.DataFrame): The DataFrame to insert
-            profile (Profile | str): The profile/uri to insert the DataFrame into.
+            profile (Profile | str): The profile or URI of the graph to insert the DataFrame into.
             include_mrid (bool, optional): Include the mRID in the triples. Defaults to True.
         """
-        profile_uri = self.graphs[profile] if isinstance(profile, Profile) else profile
+        profile_uri = self._get_profile_uri(profile)
 
         logging.debug(
             "Inserting %s triples into %s",
@@ -93,18 +98,20 @@ class CgmesDataset(SparqlDataSource):
             profile_uri,
         )
 
+        max_rows_per_insert = MAX_TRIPLES_PER_INSERT // df.shape[1]
+
         # Split Dataframe if it has more than MAX_TRIPLES_PER_INSERT rows
-        if df.shape[0] > MAX_ROWS_PER_INSERT:
-            num_chunks = df.shape[0] // MAX_ROWS_PER_INSERT
+        if df.shape[0] > max_rows_per_insert:
+            num_chunks = df.shape[0] // max_rows_per_insert
             for i in range(num_chunks):
                 self._insert_df(
-                    df.iloc[i * MAX_ROWS_PER_INSERT : (i + 1) * MAX_ROWS_PER_INSERT],
+                    df.iloc[i * max_rows_per_insert : (i + 1) * max_rows_per_insert],
                     profile_uri,
                     include_mrid,
                 )
-            if df.shape[0] % MAX_ROWS_PER_INSERT != 0:
+            if df.shape[0] % max_rows_per_insert != 0:
                 self._insert_df(
-                    df.iloc[num_chunks * MAX_ROWS_PER_INSERT :],
+                    df.iloc[num_chunks * max_rows_per_insert :],
                     profile_uri,
                     include_mrid,
                 )
@@ -123,32 +130,65 @@ class CgmesDataset(SparqlDataSource):
             triples += [f"{uri} {col} {row}." for uri, row in zip(uris, df[col])]
 
         insert_query = f"""
-            {self._prefixes}
             INSERT DATA {{
                 GRAPH <{graph}> {{
                     {"".join(triples)}
                 }}
             }}
         """
-        self.update(insert_query, add_prefixes=False)
+        self.update(insert_query)
 
-    def insert_triples(self, triples: list[tuple[str, str, str]], graph: str):
+    def insert_triples(
+        self, triples: list[tuple[str, str, str]], profile: Profile | str
+    ):
         """Insert a list of RDF triples into the dataset.
         Args:
             triples (list[str]): A list of RDF triples in the format "subject predicate object".
+            profile (Profile | str): The profile or URI of the graph to insert the triples into.
         """
 
+        # Split triples if they exceed MAX_TRIPLES_PER_INSERT
+        if len(triples) > MAX_TRIPLES_PER_INSERT:
+            num_chunks = len(triples) // MAX_TRIPLES_PER_INSERT
+            for i in range(num_chunks):
+                self._insert_triples(
+                    triples[
+                        i * MAX_TRIPLES_PER_INSERT : (i + 1) * MAX_TRIPLES_PER_INSERT
+                    ],
+                    profile,
+                )
+            if len(triples) % MAX_TRIPLES_PER_INSERT != 0:
+                self._insert_triples(
+                    triples[num_chunks * MAX_TRIPLES_PER_INSERT :], profile
+                )
+        else:
+            self._insert_triples(triples, profile)
+
+    def _insert_triples(
+        self, triples: list[tuple[str, str, str]], profile: Profile | str
+    ):
+
+        profile_uri = self._get_profile_uri(profile)
         triples_str = []
 
         for subject, predicate, obj in triples:
             triples_str.append(f"{subject} {predicate} {obj}.")
 
-        insert_query = f"""
-            {self._prefixes}
+        if profile_uri == "default":
+            insert_query = f"""
             INSERT DATA {{
-                GRAPH <{graph}> {{
                     {"\n\t\t".join(triples_str)}
-                }}
             }}
         """
-        self.update(insert_query, add_prefixes=False)
+        else:
+            insert_query = f"""
+                INSERT DATA {{
+                    GRAPH <{profile_uri}> {{
+                        {"\n\t\t".join(triples_str)}
+                    }}
+                }}
+            """
+        self.update(insert_query)
+
+    def _get_profile_uri(self, profile: Profile | str) -> str:
+        return self.graphs[profile] if isinstance(profile, Profile) else profile

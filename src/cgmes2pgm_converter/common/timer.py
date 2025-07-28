@@ -21,7 +21,7 @@ class Timer:
     def __init__(self, name, loglevel=logging.DEBUG):
         self.name = name
         self.loglevel = loglevel
-        self.start_time = None
+        self.start_time = time.time()
 
     def __enter__(self):
         self.start_time = time.time()

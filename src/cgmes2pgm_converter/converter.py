@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
@@ -28,7 +28,8 @@ from cgmes2pgm_converter.common import (
 )
 
 
-class AbstractCgmesToPgmConverter:
+# pylint: disable=too-few-public-methods
+class AbstractCgmesToPgmConverter(ABC):
     """
     Abstract class to convert a CGMES model to a PGM model
     """
@@ -45,18 +46,18 @@ class AbstractCgmesToPgmConverter:
 
 class CgmesToPgmConverter(AbstractCgmesToPgmConverter):
     """
-    Class to convert a CGMES model to a PGM model
+    Converts a CGMES model to a PGM model.
     """
 
     def __init__(
         self,
         datasource: CgmesDataset,
-        options: ConverterOptions = None,
+        options: ConverterOptions | None = None,
     ):
         """
         Args:
-            datasource (CgmesDataset): Data source to query CGMES data
-            options (ConverterOptions): Options for the converter
+            datasource (CgmesDataset): Datasource containing the CGMES data to convert.
+            options (ConverterOptions, optional): Configuration options for the conversion.
         """
 
         self._datasource = datasource

@@ -54,7 +54,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             (SAMPLE(?_meas_p) as ?meas_p)
             (SAMPLE(?_meas_q) as ?meas_q)
         WHERE {
-        GRAPH ?g_p {
+        GRAPH <$OP_GRAPH> {
             ?_meas_p cim:Measurement.measurementType ?_type_p;
                     cim:IdentifiedObject.name ?_name_p;
                     cim:Measurement.PowerSystemResource ?_eq;
@@ -74,7 +74,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         #?topoIsland cim:IdentifiedObject.name "Network";
         #            cim:TopologicalIsland.TopologicalNodes ?_tn.
 
-        GRAPH ?g_q {
+        GRAPH <$OP_GRAPH> {
             ?_meas_q cim:Measurement.measurementType ?_type_q;
                     cim:IdentifiedObject.name ?_name_q;
                     cim:Measurement.PowerSystemResource ?_eq;
@@ -88,11 +88,11 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         }
         FiLTER(?_type_q = "ThreePhaseReactivePower")
 
-        GRAPH ?g_p_val {
+        GRAPH <$MEAS_GRAPH> {
             ?_measVal_p cim:AnalogValue.value ?_p.
         }
 
-        GRAPH ?g_q_val {
+        GRAPH <$MEAS_GRAPH> {
             ?_meas_val_q cim:AnalogValue.value ?_q.
         }
 
@@ -215,7 +215,11 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         return arr, extra_info
 
     def _read_meas_from_graph(self):
-        args = {"$TOPO_ISLAND": self._at_topo_island_node("?_tn")}
+        args = {
+            "$TOPO_ISLAND": self._at_topo_island_node("?_tn"),
+            "$OP_GRAPH": self._source.graphs[Profile.OP],
+            "$MEAS_GRAPH": self._source.graphs[Profile.MEAS],
+        }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
         res["meas_type"] = SymPowerType.FIELD
