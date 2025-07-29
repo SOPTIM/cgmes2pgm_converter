@@ -21,55 +21,53 @@ from ..component import AbstractPgmComponentBuilder
 class LinkBuilder(AbstractPgmComponentBuilder):
     _query = """
         SELECT  ?eq
-                (SAMPLE(?_name) as ?name)
-                (SAMPLE(?_tn1) as ?tn1)
-                (SAMPLE(?_tn2) as ?tn2)
-                (SAMPLE(?_status1) as ?status1)
-                (SAMPLE(?_status2) as ?status2)
-                (SAMPLE(?_term1) as ?term1)
-                (SAMPLE(?_term2) as ?term2)
-                (SAMPLE(?_open) as ?open)
-                (SAMPLE(?__type) as ?type)
+                ?name
+                ?tn1
+                ?tn2
+                ?status1
+                ?status2
+                ?term1
+                ?term2
+                ?open
+                ?type
         WHERE {
 
             VALUES ?_type { cim:Breaker cim:Switch cim:Disconnector}
             ?eq a ?_type;
-                cim:IdentifiedObject.name ?_name;
+                cim:IdentifiedObject.name ?name;
                 $IN_SERVICE
                 # cim:Equipment.inService "true";
-                cim:Switch.open ?_open.
+                cim:Switch.open ?open.
 
-            BIND(STRAFTER(STR(?_type), "#") AS ?__type)
+            BIND(STRAFTER(STR(?_type), "#") AS ?type)
 
-            ?_term1 a cim:Terminal;
+            ?term1 a cim:Terminal;
                     cim:Terminal.ConductingEquipment ?eq;
-                    cim:Terminal.TopologicalNode ?_tn1;
+                    cim:Terminal.TopologicalNode ?tn1;
                     cim:ACDCTerminal.sequenceNumber "1";
-                    cim:ACDCTerminal.connected ?_status1.
+                    cim:ACDCTerminal.connected ?status1.
 
-            ?_term2 a cim:Terminal;
+            ?term2 a cim:Terminal;
                       cim:Terminal.ConductingEquipment ?eq;
-                      cim:Terminal.TopologicalNode ?_tn2;
+                      cim:Terminal.TopologicalNode ?tn2;
                       cim:ACDCTerminal.sequenceNumber "2";
-                      cim:ACDCTerminal.connected ?_status2.
+                      cim:ACDCTerminal.connected ?status2.
 
             $TOPO_ISLAND
             #?topoIsland cim:IdentifiedObject.name "Network";
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn1;
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn2.
+            #            cim:TopologicalIsland.TopologicalNodes ?tn1;
+            #            cim:TopologicalIsland.TopologicalNodes ?tn2.
 
-            FILTER(?_tn1 != ?_tn2)
-            FILTER(?_status1 = "true" &&  ?_status2 = "true" && ?_open = "false")
+            FILTER(?tn1 != ?tn2)
+            FILTER(?status1 = "true" && ?status2 = "true" && ?open = "false")
         }
-
-        GROUP BY ?eq
         ORDER BY ?eq
     """
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
         args = {
             "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?_tn1", "?_tn2"),
+            "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
         }
         q = self._replace(self._query, args)
         res = self._source.query(q)
