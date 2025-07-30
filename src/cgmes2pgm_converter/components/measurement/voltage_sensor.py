@@ -46,7 +46,7 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
                 OPTIONAL { ?measVal_v cim:MeasurementValue.sensorSigma ?sigma_u. }
 
             }
-            FILTER(?type_u = "Voltage")
+            VALUES ?type_u { "Voltage" "LineToLineVoltage" }
 
             ?term cim:Terminal.TopologicalNode ?tn.
 
@@ -64,25 +64,22 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     """
 
     _query_meas_in_default = """
-        SELECT ?eq ?tn ?term ?u ?sigma_u ?name ?meas_u ?nom_u
+        SELECT ?eq ?tn ?term ?max_u ?min_u ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
-            ?meas_u cim:Measurement.measurementType "LineToLineVoltage";
-                  cim:IdentifiedObject.name ?name;
-                  cim:Measurement.PowerSystemResource ?eq;
-                  cim:Measurement.Terminal ?term.
+            ?meas_u cim:Measurement.measurementType ?type_u;
+                    cim:IdentifiedObject.name ?name;
+                    cim:Measurement.PowerSystemResource ?eq;
+                    cim:Measurement.Terminal ?term.
 
+            ?measVal_v cim:AnalogValue.Analog ?meas_u;
+            OPTIONAL { ?measVal_v cim:MeasurementValue.sensorAccuracy ?acc_u. }
+            OPTIONAL { ?measVal_v cim:MeasurementValue.sensorSigma ?sigma_u. }
 
-            ?_measVal_scada cim:AnalogValue.Analog ?meas_u;
-                            cim:MeasurementValue.MeasurementValueSource/cim:IdentifiedObject.name "SCADA";
-                            cim:AnalogValue.value ?u.
+            VALUES ?type_u { "Voltage" "LineToLineVoltage" }
 
-            OPTIONAL {
-                ?_measVal_est cim:AnalogValue.Analog ?meas_u;
-                              cim:MeasurementValue.sensorAccuracy ?sigma_u.
-            }
+            ?term cim:Terminal.TopologicalNode ?tn.
 
-            ?term cim:Terminal.TopologicalNode ?tn;
-                  cim:Terminal.ConductingEquipment ?eq.
+            ?measVal_v cim:AnalogValue.value ?u.
 
             ?tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nom_u.
 

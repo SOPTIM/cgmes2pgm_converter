@@ -109,30 +109,34 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?term
             ?value
             ?sigma
+            ?acc
             ?name
             ?meas
             ?pfi
         WHERE {
             # "ThreePhaseActivePower" or "ThreePhaseReactivePower"
             ?meas cim:Measurement.measurementType $MEASUREMENT_TYPE;
-                        cim:IdentifiedObject.name ?name;
-                        cim:Measurement.Terminal ?term.
+                  cim:IdentifiedObject.name ?name;
+                  cim:Measurement.Terminal ?term.
 
             OPTIONAL {
-                ?meas cim:Analog.positiveFlowIn ?pfi.
+                ?meas cim:Analog.positiveFlowIn ?_pfi.
             }
+            BIND(IF(BOUND(?_pfi), ?_pfi, "false") AS ?pfi)
 
             ?_measVal_scada cim:AnalogValue.Analog ?meas;
-                            cim:MeasurementValue.MeasurementValueSource/cim:IdentifiedObject.name "SCADA";
                             cim:AnalogValue.value ?value.
 
             OPTIONAL {
-                ?_measVal_est cim:AnalogValue.Analog ?meas;
-                              cim:MeasurementValue.sensorAccuracy ?sigma.
+                ?_measVal_scada cim:MeasurementValue.sensorAccuracy ?acc.
+            }
+
+            OPTIONAL {
+                ?_measVal_scada cim:MeasurementValue.sensorSigma ?sigma.
             }
 
             ?term cim:Terminal.TopologicalNode ?tn;
-                cim:Terminal.ConductingEquipment ?eq.
+                  cim:Terminal.ConductingEquipment ?eq.
 
             ?tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nomv.
 
