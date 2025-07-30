@@ -236,7 +236,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         res_p = self._source.query(q_p)
 
         # Invert Measurement if "positiveFlowIn" is set to true
-        res_p["value"] = res_p["value"].where(res_p["pfi"], res_p["value"] * -1)
+        res_p["value"] = res_p["value"].where(~res_p["pfi"], res_p["value"] * -1)
 
         # Read reactive power measurements
         args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
@@ -244,7 +244,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         res_q = self._source.query(q_q)
 
         # Invert Measurement if "positiveFlowIn" is set to true
-        res_q["value"] = res_q["value"].where(res_q["pfi"], res_q["value"] * -1)
+        res_q["value"] = res_q["value"].where(~res_q["pfi"], res_q["value"] * -1)
 
         meas_by_term = {}
         self._join_measurements_by_terminal(
