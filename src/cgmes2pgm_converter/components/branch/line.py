@@ -23,21 +23,21 @@ from ..component import AbstractPgmComponentBuilder
 class LineBuilder(AbstractPgmComponentBuilder):
     _query = """
         SELECT  ?line
-                (SAMPLE(?_name) as ?name)
-                (SAMPLE(?_bch) as ?bch)
-                (SAMPLE(?_gch) as ?gch)
-                (SAMPLE(?_length) as ?length)
-                (SAMPLE(?_r) as ?r)
-                (SAMPLE(?_x) as ?x)
-                (SAMPLE(?_tn1) as ?tn1)
-                (SAMPLE(?_tn2) as ?tn2)
-                (SAMPLE(?_nomv1) as ?nomv1)
-                (SAMPLE(?_nomv2) as ?nomv2)
-                (SAMPLE(?_status1) as ?status1)
-                (SAMPLE(?_status2) as ?status2)
-                (SAMPLE(?__type) as ?type)
-                (SAMPLE(?_term1) as ?term1)
-                (SAMPLE(?_term2) as ?term2)
+                ?name
+                ?bch
+                ?gch
+                ?length
+                ?r
+                ?x
+                ?tn1
+                ?tn2
+                ?nomv1
+                ?nomv2
+                ?status1
+                ?status2
+                ?type
+                ?term1
+                ?term2
         WHERE {
             VALUES ?_type {
                 cim:ACLineSegment
@@ -47,9 +47,9 @@ class LineBuilder(AbstractPgmComponentBuilder):
             ?line a ?_type;
                     $IN_SERVICE
                     # cim:Equipment.inService "true";
-                    cim:IdentifiedObject.name ?_name.
+                    cim:IdentifiedObject.name ?name.
 
-            BIND(STRAFTER(STR(?_type), "#") AS ?__type)
+            BIND(STRAFTER(STR(?_type), "#") AS ?type)
 
             OPTIONAL { ?line cim:ACLineSegment.r ?_aclR. }
             OPTIONAL { ?line cim:ACLineSegment.x ?_aclX. }
@@ -62,39 +62,37 @@ class LineBuilder(AbstractPgmComponentBuilder):
             OPTIONAL { ?line cim:SeriesCompensator.r ?_srcR. }
             OPTIONAL { ?line cim:SeriesCompensator.x ?_srcX. }
 
-            ?_term1 a cim:Terminal;
+            ?term1 a cim:Terminal;
                 cim:Terminal.ConductingEquipment ?line;
-                cim:Terminal.TopologicalNode ?_tn1;
+                cim:Terminal.TopologicalNode ?tn1;
                 cim:ACDCTerminal.sequenceNumber "1"; ## order Terminal/Node by sequence number
-                cim:ACDCTerminal.connected ?_status1.
+                cim:ACDCTerminal.connected ?status1.
 
-            ?_term2 a cim:Terminal;
+            ?term2 a cim:Terminal;
                       cim:Terminal.ConductingEquipment ?line;
-                      cim:Terminal.TopologicalNode ?_tn2;
+                      cim:Terminal.TopologicalNode ?tn2;
                       cim:ACDCTerminal.sequenceNumber "2";
-                      cim:ACDCTerminal.connected ?_status2.
+                      cim:ACDCTerminal.connected ?status2.
 
-            ?_tn1 cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv1.
-            ?_tn2 cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv2.
+            ?tn1 cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nomv1.
+            ?tn2 cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nomv2.
 
             $TOPO_ISLAND
             #?topoIsland cim:IdentifiedObject.name "Network";
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn1;
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn2.
+            #            cim:TopologicalIsland.TopologicalNodes ?tn1;
+            #            cim:TopologicalIsland.TopologicalNodes ?tn2.
 
-            BIND(COALESCE(?_aclR, ?_eqbR, ?_srcR, "0.0") as ?_r)
-            BIND(COALESCE(?_aclX, ?_eqbX, ?_srcX, "0.0") as ?_x)
-            BIND(COALESCE(?_aclBch, "0.0") as ?_bch)
-            BIND(COALESCE(?_aclGch, "0.0") as ?_gch)
+            BIND(COALESCE(?_aclR, ?_eqbR, ?_srcR, "0.0") as ?r)
+            BIND(COALESCE(?_aclX, ?_eqbX, ?_srcX, "0.0") as ?x)
+            BIND(COALESCE(?_aclBch, "0.0") as ?bch)
+            BIND(COALESCE(?_aclGch, "0.0") as ?gch)
 
-            FILTER(?_tn1 != ?_tn2)
-            FILTER(?_status1 = "true" &&  ?_status2 = "true")
+            FILTER(?tn1 != ?tn2)
+            FILTER(?status1 = "true" &&  ?status2 = "true")
 
             $NOMV_FILTER
-            #FILTER(?_nomv1 = ?_nomv2)
+            #FILTER(?nomv1 = ?nomv2)
         }
-
-        GROUP BY ?line
         ORDER BY ?line
     """
 
@@ -114,8 +112,8 @@ class LineBuilder(AbstractPgmComponentBuilder):
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
         args = {
             "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?_tn1", "?_tn2"),
-            "$NOMV_FILTER": "FILTER(?_nomv1 = ?_nomv2)",  # <- filter for same voltage levels
+            "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
+            "$NOMV_FILTER": "FILTER(?nomv1 = ?nomv2)",  # <- filter for same voltage levels
         }
         q = self._replace(self._query, args)
         res = self._source.query(q)

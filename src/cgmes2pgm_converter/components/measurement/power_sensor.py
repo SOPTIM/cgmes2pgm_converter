@@ -39,11 +39,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             (SAMPLE(?_eq) as ?eq)
             (SAMPLE(?_tn) as ?tn)
             ?term
-            (SAMPLE(?_max_p) as ?max_p)
-            (SAMPLE(?_min_p) as ?min_p)
             (SAMPLE(?_p) as ?p)
-            (SAMPLE(?_max_q) as ?max_q)
-            (SAMPLE(?_min_q) as ?min_q)
             (SAMPLE(?_q) as ?q)
             (SAMPLE(?_acc_p) as ?acc_p)
             (SAMPLE(?_acc_q) as ?acc_q)
@@ -58,8 +54,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?_meas_p cim:Measurement.measurementType ?_type_p;
                     cim:IdentifiedObject.name ?_name_p;
                     cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Analog.maxValue ?_max_p;
-                    cim:Analog.minValue ?_min_p;
                     cim:Measurement.Terminal ?term.
 
             ?_measVal_p cim:AnalogValue.Analog ?_meas_p.
@@ -78,8 +72,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?_meas_q cim:Measurement.measurementType ?_type_q;
                     cim:IdentifiedObject.name ?_name_q;
                     cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Analog.maxValue ?_max_q;
-                    cim:Analog.minValue ?_min_q;
                     cim:Measurement.Terminal ?term.
 
     		?_meas_val_q cim:AnalogValue.Analog ?_meas_q.
@@ -109,30 +101,34 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?term
             ?value
             ?sigma
+            ?acc
             ?name
             ?meas
             ?pfi
         WHERE {
             # "ThreePhaseActivePower" or "ThreePhaseReactivePower"
             ?meas cim:Measurement.measurementType $MEASUREMENT_TYPE;
-                        cim:IdentifiedObject.name ?name;
-                        cim:Measurement.Terminal ?term.
+                  cim:IdentifiedObject.name ?name;
+                  cim:Measurement.Terminal ?term.
 
             OPTIONAL {
-                ?meas cim:Analog.positiveFlowIn ?pfi.
+                ?meas cim:Analog.positiveFlowIn ?_pfi.
             }
+            BIND(COALESCE(?_pfi, "false") AS ?pfi)
 
             ?_measVal_scada cim:AnalogValue.Analog ?meas;
-                            cim:MeasurementValue.MeasurementValueSource/cim:IdentifiedObject.name "SCADA";
                             cim:AnalogValue.value ?value.
 
             OPTIONAL {
-                ?_measVal_est cim:AnalogValue.Analog ?meas;
-                              cim:MeasurementValue.sensorAccuracy ?sigma.
+                ?_measVal_scada cim:MeasurementValue.sensorAccuracy ?acc.
+            }
+
+            OPTIONAL {
+                ?_measVal_scada cim:MeasurementValue.sensorSigma ?sigma.
             }
 
             ?term cim:Terminal.TopologicalNode ?tn;
-                cim:Terminal.ConductingEquipment ?eq.
+                  cim:Terminal.ConductingEquipment ?eq.
 
             ?tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nomv.
 
@@ -236,7 +232,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         res_p = self._source.query(q_p)
 
         # Invert Measurement if "positiveFlowIn" is set to true
-        res_p["value"] = res_p["value"].where(res_p["pfi"], res_p["value"] * -1)
+        res_p["value"] = res_p["value"].where(~res_p["pfi"], res_p["value"] * -1)
 
         # Read reactive power measurements
         args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
@@ -244,7 +240,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         res_q = self._source.query(q_q)
 
         # Invert Measurement if "positiveFlowIn" is set to true
-        res_q["value"] = res_q["value"].where(res_q["pfi"], res_q["value"] * -1)
+        res_q["value"] = res_q["value"].where(~res_q["pfi"], res_q["value"] * -1)
 
         meas_by_term = {}
         self._join_measurements_by_terminal(
