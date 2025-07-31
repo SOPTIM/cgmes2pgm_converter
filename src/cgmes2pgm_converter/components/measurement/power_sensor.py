@@ -39,11 +39,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             (SAMPLE(?_eq) as ?eq)
             (SAMPLE(?_tn) as ?tn)
             ?term
-            (SAMPLE(?_max_p) as ?max_p)
-            (SAMPLE(?_min_p) as ?min_p)
             (SAMPLE(?_p) as ?p)
-            (SAMPLE(?_max_q) as ?max_q)
-            (SAMPLE(?_min_q) as ?min_q)
             (SAMPLE(?_q) as ?q)
             (SAMPLE(?_acc_p) as ?acc_p)
             (SAMPLE(?_acc_q) as ?acc_q)
@@ -58,8 +54,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?_meas_p cim:Measurement.measurementType ?_type_p;
                     cim:IdentifiedObject.name ?_name_p;
                     cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Analog.maxValue ?_max_p;
-                    cim:Analog.minValue ?_min_p;
                     cim:Measurement.Terminal ?term.
 
             ?_measVal_p cim:AnalogValue.Analog ?_meas_p.
@@ -78,8 +72,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?_meas_q cim:Measurement.measurementType ?_type_q;
                     cim:IdentifiedObject.name ?_name_q;
                     cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Analog.maxValue ?_max_q;
-                    cim:Analog.minValue ?_min_q;
                     cim:Measurement.Terminal ?term.
 
     		?_meas_val_q cim:AnalogValue.Analog ?_meas_q.
@@ -122,7 +114,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             OPTIONAL {
                 ?meas cim:Analog.positiveFlowIn ?_pfi.
             }
-            BIND(IF(BOUND(?_pfi), ?_pfi, "false") AS ?pfi)
+            BIND(COALESCE(?_pfi, "false") AS ?pfi)
 
             ?_measVal_scada cim:AnalogValue.Analog ?meas;
                             cim:AnalogValue.value ?value.

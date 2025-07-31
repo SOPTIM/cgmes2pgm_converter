@@ -79,8 +79,8 @@ class LineBuilder(AbstractPgmComponentBuilder):
 
             $TOPO_ISLAND
             #?topoIsland cim:IdentifiedObject.name "Network";
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn1;
-            #            cim:TopologicalIsland.TopologicalNodes ?_tn2.
+            #            cim:TopologicalIsland.TopologicalNodes ?tn1;
+            #            cim:TopologicalIsland.TopologicalNodes ?tn2.
 
             BIND(COALESCE(?_aclR, ?_eqbR, ?_srcR, "0.0") as ?r)
             BIND(COALESCE(?_aclX, ?_eqbX, ?_srcX, "0.0") as ?x)

@@ -31,14 +31,11 @@ from ..component import AbstractPgmComponentBuilder
 class SymVoltageBuilder(AbstractPgmComponentBuilder):
 
     _query_meas_in_graph = """
-        SELECT ?eq ?tn ?term ?max_u ?min_u ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
+        SELECT ?tn ?term ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
             GRAPH <$OP_GRAPH> {
                 ?meas_u cim:Measurement.measurementType ?type_u;
                         cim:IdentifiedObject.name ?name;
-                        cim:Measurement.PowerSystemResource ?eq;
-                        cim:Analog.maxValue ?max_u;
-                        cim:Analog.minValue ?min_u;
                         cim:Measurement.Terminal ?term.
 
                 ?measVal_v cim:AnalogValue.Analog ?meas_u;
@@ -64,11 +61,10 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     """
 
     _query_meas_in_default = """
-        SELECT ?eq ?tn ?term ?max_u ?min_u ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
+        SELECT ?tn ?term ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
             ?meas_u cim:Measurement.measurementType ?type_u;
                     cim:IdentifiedObject.name ?name;
-                    cim:Measurement.PowerSystemResource ?eq;
                     cim:Measurement.Terminal ?term.
 
             ?measVal_v cim:AnalogValue.Analog ?meas_u;
