@@ -32,8 +32,8 @@ class EquivalentBranchBuilder(LineBuilder):
 
         args = {
             "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?_tn1", "?_tn2"),
-            "$NOMV_FILTER": "FILTER(?_nomv1 != ?_nomv2)",  # <- filter for different voltage levels
+            "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
+            "$NOMV_FILTER": "FILTER(?nomv1 != ?nomv2)",  # <- filter for different voltage levels
         }
         q = self._replace(self._query, args)
         res = self._source.query(q)
