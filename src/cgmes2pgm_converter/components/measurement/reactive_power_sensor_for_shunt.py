@@ -221,7 +221,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
             "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
         }
         q = self._replace(self._query_meas_in_default, args)
-        res = self._source.query(q, remove_uuid_base_uri=False)
+        res = self._source.query(q)
         return res
 
     def _read_meas_from_named_graph(self):
@@ -230,7 +230,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
             "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
         }
         q = self._replace(self._query_meas_in_graph, args)
-        res = self._source.query(q, remove_uuid_base_uri=False)
+        res = self._source.query(q)
         return res
 
     def component_name(self) -> ComponentType:
