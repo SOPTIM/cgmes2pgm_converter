@@ -146,7 +146,7 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     def _read_meas_from_default_graph(self):
         args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
         q = self._replace(self._query_meas_in_default, args)
-        res = self._source.query(q, remove_uuid_base_uri=False)
+        res = self._source.query(q)
 
         meas_by_tn = self._join_measurements_by_node(res)
 
