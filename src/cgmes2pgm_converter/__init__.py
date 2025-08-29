@@ -13,9 +13,9 @@
 # limitations under the License.
 
 """
-This package provides a library to convert 
-Common Grid Model Exchange Standard (CGMES) data to PGM format 
-and apply the State Estimation from 
+This package provides a library to convert
+Common Grid Model Exchange Standard (CGMES) data to PGM format
+and apply the State Estimation from
 [PowerGridModel](https://github.com/PowerGridModel/power-grid-model).
 """
 

@@ -76,6 +76,17 @@ class CgmesDataset(SparqlDataSource):
         mrid = mrid.replace('"', "")
         return f"<urn:uuid:{mrid}>"
 
+    def query(
+        self, query: str, add_prefixes=True, remove_uuid_base_uri=True
+    ) -> pd.DataFrame:
+        result = super().query(query, add_prefixes)
+        if remove_uuid_base_uri:
+            # Remove the base URI from all IRIs (if wanted) -> helps to keep the output clean
+            prefix = self.base_url + "#"
+            for col in result.select_dtypes(include="object"):
+                result[col] = result[col].str.replace(f"^{prefix}", "", regex=True)
+        return result
+
     def insert_df(
         self, df: pd.DataFrame, profile: Profile | str, include_mrid=True
     ) -> None:
