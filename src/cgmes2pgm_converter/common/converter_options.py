@@ -15,7 +15,10 @@
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .measurement_substitution import MeasurementSubstitutionOptions
+from .measurement_substitution import (
+    LinkAsShortLineOptions,
+    MeasurementSubstitutionOptions,
+)
 from .network_splitting import NetworkSplittingOptions
 
 
@@ -59,6 +62,9 @@ class ConverterOptions:
     )
     network_splitting: NetworkSplittingOptions = field(
         default_factory=NetworkSplittingOptions
+    )
+    link_as_short_line: LinkAsShortLineOptions = field(
+        default_factory=LinkAsShortLineOptions
     )
 
     # Deprecated: support for disabling the use of generic branches has been removed

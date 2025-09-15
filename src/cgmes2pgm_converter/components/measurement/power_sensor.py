@@ -39,6 +39,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             (SAMPLE(?_eq) as ?eq)
             (SAMPLE(?_tn) as ?tn)
             ?term
+            (SAMPLE(?_eq_type) as ?eq_type)
             (SAMPLE(?_p) as ?p)
             (SAMPLE(?_q) as ?q)
             (SAMPLE(?_acc_p) as ?acc_p)
@@ -61,6 +62,8 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorSigma ?_sigma_p. }
         }
         FILTER(?_type_p = "ThreePhaseActivePower")
+
+        ?_eq rdf:type ?_eq_type.
 
         ?term cim:Terminal.TopologicalNode ?_tn.
 
@@ -502,6 +505,23 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
                 ]
                 node_to = input_data[ComponentType.line]["to_node"][
                     input_data[ComponentType.line]["id"] == eq_id
+                ]
+
+                if meas_node == node_from:
+                    terminal_types[i] = MeasuredTerminalType.branch_from
+                elif meas_node == node_to:
+                    terminal_types[i] = MeasuredTerminalType.branch_to
+
+            elif (
+                eq_id in input_data[ComponentType.link]["id"]
+                and self._converter_options.link_as_short_line.enable
+            ):
+
+                node_from = input_data[ComponentType.link]["from_node"][
+                    input_data[ComponentType.link]["id"] == eq_id
+                ]
+                node_to = input_data[ComponentType.link]["to_node"][
+                    input_data[ComponentType.link]["id"] == eq_id
                 ]
 
                 if meas_node == node_from:
