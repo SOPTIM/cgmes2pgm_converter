@@ -32,6 +32,7 @@ from .measurement_substitution import (
     BranchMeasurements,
     DefaultSigma,
     IncompleteMeasurements,
+    LinkAsShortLineOptions,
     MeasSub,
     MeasurementSubstitutionOptions,
     PassiveNodeOptions,

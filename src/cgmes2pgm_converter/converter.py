@@ -147,6 +147,7 @@ class CgmesToPgmConverter(AbstractCgmesToPgmConverter):
             c.SymPowerSensorIncompleteAppliance,
             c.SymLoadOrGenForPassiveNodeBuilder,
             c.SymPowerForPassiveNodeBuilder,
+            c.GenericBranchFromLinkBuilder,
         ]
         return [
             builder(self._datasource, self._id_mapping, self._options)

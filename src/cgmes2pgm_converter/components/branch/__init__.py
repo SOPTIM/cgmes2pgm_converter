@@ -17,6 +17,7 @@ This module contains the builders for different types of branches in the power g
 """
 
 from .equivalent_branch import EquivalentBranchBuilder
+from .gb_from_link import GenericBranchFromLinkBuilder
 from .line import LineBuilder
 from .link import LinkBuilder
 from .transformer import *

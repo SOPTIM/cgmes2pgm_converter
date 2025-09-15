@@ -54,6 +54,23 @@ class SshSubstitutionOptions:
 
 
 @dataclass
+class LinkAsShortLineOptions:
+    """
+    Generate measurements for generators and loads
+    without an existing power measurement using SSH values.
+
+    Attributes:
+        enable (bool): Whether to use SSH values for substitution.
+        sigma (float): The default sigma value for the substituted measurements (MW).
+    """
+
+    enable: bool = False
+    sigma_factor: float = 1.5
+    r: float = 0.01
+    x: float = 0.01
+
+
+@dataclass
 class UMeasurementSubstitutionOptions:
     """
     Options to generate voltage measurements based on the voltage level of a node.
