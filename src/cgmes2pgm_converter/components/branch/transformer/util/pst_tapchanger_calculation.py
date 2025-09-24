@@ -50,19 +50,18 @@ def calc_theta_k_2w(
     match taptype:
         case "PhaseTapChangerTabular":
             theta = _calc_theta_tabular(trafo, tapside)
-            k = _calc_k(trafo)
+            k = _calc_k_tabular(trafo)
         case "InPhaseAndTabularPST":
             theta = _calc_theta_tabular(trafo, tapside)
             k = calc_k_tabular_in_phase(trafo, tapside, tapside_rtc)
         case "PhaseTapChangerLinear":
-            theta = _calc_theta_linear(trafo, tapside)
-            k = _calc_k(trafo)
-        case "PhaseTapChangerSymmetrical":
-            theta = _calc_theta_symmetrical(trafo, tapside)
-            k = _calc_k(trafo)
-        case "PhaseTapChangerAsymmetrical":
-            logging.warning("Found Transformer with a PhaseTapChangerAsymmetrical.")
+            logging.warning("Found Transformer with a PhaseTapChangerLinear.")
             logging.warning("\tElectrical Parameters may be inaccurate.")
+            theta = _calc_theta_linear(trafo, tapside)
+            k = _calc_k_tabular(trafo)
+        case "PhaseTapChangerSymmetrical":
+            theta, k = _calc_theta_symmetrical(trafo, tapside)
+        case "PhaseTapChangerAsymmetrical":
             theta, k = _calc_theta_k_asymmetrical(trafo, tapside)
         case "PhaseTapChanger" | "PhaseTapChangerNonLinear":
             logging.warning(
@@ -98,7 +97,8 @@ def calc_theta_k_3w(trafo, tapside, current_side):
         return calc_theta_k_2w(trafo, tapside, tapside_rtc)
 
     # The current 2w is a trafo without a tapchanger
-    return 0.0, _calc_k(trafo)
+    # TODO: validate call of _calc_k_tabular
+    return 0.0, _calc_k_tabular(trafo)
 
 
 def _calc_theta_tabular(trafo, tapside):
@@ -111,6 +111,7 @@ def _calc_theta_tabular(trafo, tapside):
 
     theta = tc_angle * deg_to_rad
 
+    ## TODO: validate with better network!
     if tapside == 2:
         theta *= -1
 
@@ -123,7 +124,8 @@ def calc_k_tabular_in_phase(
     tapside_rtc,
 ):
     ## RTC
-    steps_rtc = trafo[f"neutralStep{tapside_rtc}_rtc"] - trafo[f"step{tapside_rtc}_rtc"]
+    steps_rtc = trafo[f"step{tapside_rtc}_rtc"] - trafo[f"neutralStep{tapside_rtc}_rtc"]
+
     voltage_increment_rtc = trafo[f"stepSize{tapside_rtc}"]
 
     u_netz1 = trafo["nomU1"]
@@ -188,6 +190,7 @@ def _calc_theta_linear(trafo, tapside):
     # α = s * ∂α
     # r = 1
 
+    # TODO: validate if (step - neutralStep) or (neutralStep - step)
     steps = trafo[f"neutralStep{tapside}"] - trafo[f"step{tapside}"]
     shift_per_step = trafo[f"stepPhaseShift{tapside}"] * deg_to_rad
     theta = steps * shift_per_step
@@ -200,26 +203,42 @@ def _calc_theta_linear(trafo, tapside):
 
 
 def _calc_theta_symmetrical(trafo, tapside):
-    # s = n-n_0
-    # α = 2 * atan(0.5 * s * ∂u)
-    # r = 1
-    steps = trafo[f"neutralStep{tapside}"] - trafo[f"step{tapside}"]
+    # Formula from ENTSO-E "Phase Shift Transformers Modelling", chapter 4.2
+    #   s = n-n_0
+    #   α = 2 * atan(0.5 * s * ∂u)
+    #   r = 1
+    steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
 
-    ## from ENTSO-E "Phase Shift Transformers Modelling", chapter 4.2
-    theta = 2.0 * np.arctan(0.5 * steps * voltage_increment)
+    # theta = 2.0 * np.arctan(0.5 * steps * voltage_increment/100)
+    # if tapside == 1:
+    #     theta *= -1
 
-    # TODO: check with an example where tapside == 2
-    if tapside == 1:
-        theta *= -1
+    rated_u1_ = trafo["ratedU1"]
+    rated_u2_ = trafo["ratedU2"]
+    u_netz2 = trafo["nomU2"]
+    u_netz1 = trafo["nomU1"]
 
-    return theta
+    w0 = (rated_u2_ / u_netz2) / (rated_u1_ / u_netz1)
+    w0 = 1 / w0
+
+    angle = 90 * deg_to_rad
+    nenner_pst = 1 + ((steps / 100) * voltage_increment) * complex(
+        np.cos(angle), np.sin(angle)
+    )
+    t_pst = w0 / nenner_pst
+
+    k = 1 / (abs(t_pst) * w0)
+
+    theta = -np.angle(t_pst)
+
+    return theta, k
 
 
 def _calc_theta_k_asymmetrical(trafo, tapside):
     steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
-    winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"] * deg_to_rad
+    winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"]
 
     u_netz1 = trafo["nomU1"]
     u_netz2 = trafo["nomU2"]
@@ -233,7 +252,7 @@ def _calc_theta_k_asymmetrical(trafo, tapside):
         pst_tapside=tapside,
         pst_step=steps,
         pst_voltage_increment=voltage_increment,
-        winding_connection_angle=winding_connection_angle / deg_to_rad,
+        winding_connection_angle=winding_connection_angle,
         u_rated1=u_rated1,
         u_rated2=u_rated2,
         u_netz1=u_netz1,
@@ -252,7 +271,7 @@ def calc_theta_k_asymmetrical_in_phase(
     steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
 
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
-    winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"] * deg_to_rad
+    winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"]
 
     ## RTC
 
@@ -271,7 +290,7 @@ def calc_theta_k_asymmetrical_in_phase(
         pst_tapside=tapside,
         pst_step=steps,
         pst_voltage_increment=voltage_increment,
-        winding_connection_angle=winding_connection_angle / deg_to_rad,
+        winding_connection_angle=winding_connection_angle,
         u_rated1=u_rated1,
         u_rated2=u_rated2,
         u_netz1=u_netz1,
@@ -337,7 +356,7 @@ def calc_theta_k_generic(
     return theta, k
 
 
-def _calc_k(trafo):
+def _calc_k_tabular(trafo):
     nominal_ratio_ = trafo["nomU1"] / trafo["nomU2"]
     rated_u1_ = trafo["ratedU1"]
     rated_u2_ = trafo["ratedU2"]
@@ -351,9 +370,8 @@ def _calc_k(trafo):
         corr_u1_ *= tc_ratio1
     elif not np.isnan(tc_ratio2):
         corr_u2_ *= tc_ratio2
-    k = (corr_u1_ / corr_u2_) / nominal_ratio_
 
-    ## TODO: determine why reciprocal is better in some cases, but not in all cases
+    k = (corr_u1_ / corr_u2_) / nominal_ratio_
     k = 1 / k
 
     return k
