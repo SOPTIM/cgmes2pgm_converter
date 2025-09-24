@@ -27,7 +27,12 @@ class Pst2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
         return self._converter_options.use_generic_branch[BranchType.PST]
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        res = self._get_pst_result()
+        res_ptc = self._get_pst_result()
+
+        res_rtc = self._get_query_result()
+
+        # join RTC columns to the PTCs
+        res = res_ptc.merge(res_rtc, on="tr1", how="left", suffixes=("", "_rtc"))
 
         self._validate_transformer_data(res)
 
@@ -63,8 +68,13 @@ class Pst2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
         theta = []
         k = []
         for idx, trafo in res.iterrows():
-            tapside = 1 if isinstance(trafo["tapchanger1"], str) else 2
-            theta_, k_ = calc_theta_k_2w(trafo, tapside)
+            tapside_pst = 1 if isinstance(trafo["tapchanger1"], str) else 2
+            tapside_rtc = 0
+            if isinstance(trafo["_ratiotap_type1"], str):
+                tapside_rtc = 1
+            elif isinstance(trafo["_ratiotap_type2"], str):
+                tapside_rtc = 2
+            theta_, k_ = calc_theta_k_2w(trafo, tapside_pst, tapside_rtc)
 
             theta.append(theta_)
             k.append(k_)
