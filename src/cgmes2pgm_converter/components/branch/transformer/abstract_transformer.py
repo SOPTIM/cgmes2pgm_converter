@@ -23,7 +23,7 @@ from ...component import AbstractPgmComponentBuilder
 class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
 
     _query = """
-        SELECT ?tr ?name ?_term ?trEnd ?node ?b ?connectionType ?g ?r ?x ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland
+        SELECT ?tr ?name ?_term ?trEnd ?node ?b ?connectionType ?g ?r ?x ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_ratiotap_type
         WHERE {
 
         {
@@ -59,15 +59,22 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
             ?_ratiotapchanger a ?_ratiotap_type;
                                 cim:RatioTapChanger.TransformerEnd ?trEnd;
                                 cim:RatioTapChanger.stepVoltageIncrement ?stepSize;
-                                cim:TapChanger.step ?step;
                                 cim:TapChanger.normalStep ?normalStep;
                                 cim:TapChanger.neutralStep ?neutralStep;
                                 cim:TapChanger.highStep ?highStep;
                                 cim:TapChanger.lowStep ?lowStep;
                                 cim:TapChanger.neutralU ?neutralU.
 
-            ?svTap cim:SvTapStep.TapChanger ?_ratiotapchanger;
-                cim:SvTapStep.position ?svStep.
+            OPTIONAL {
+                ?_ratiotapchanger cim:TapChanger.step ?tcStep;
+            }
+
+            OPTIONAL {
+                ?svTap cim:SvTapStep.TapChanger ?_ratiotapchanger;
+                    cim:SvTapStep.position ?svStep.
+            }
+
+            BIND(COALESCE(?svStep, ?tcStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             OPTIONAL {
                 ?_ratiotapchanger cim:RatioTapChanger.RatioTapChangerTable ?_table.
@@ -79,7 +86,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                         cim:TapChangerTablePoint.x ?_tx;
                         cim:TapChangerTablePoint.ratio ?_tratio;
                         cim:TapChangerTablePoint.step ?_tstep.
-                filter(xsd:float(?_tstep) = xsd:float(?svStep))
+                filter(xsd:float(?_tstep) = xsd:float(?step))
             }
         }
 
@@ -163,31 +170,37 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
         OPTIONAL {
             ?tapchanger a ?_ratiotap_type;
                                 cim:PhaseTapChanger.TransformerEnd ?trEnd;
-                                cim:TapChanger.step ?step;
                                 cim:TapChanger.normalStep ?normalStep;
                                 cim:TapChanger.neutralStep ?neutralStep;
                                 cim:TapChanger.highStep ?highStep;
                                 cim:TapChanger.lowStep ?lowStep;
                                 cim:TapChanger.neutralU ?neutralU.
 
-            ?svTap cim:SvTapStep.TapChanger ?tapchanger;
-                cim:SvTapStep.position ?svStep.
+            OPTIONAL {
+                ?tapchanger cim:TapChanger.step ?tcStep;
+            }
+
+            OPTIONAL {
+                ?svTap cim:SvTapStep.TapChanger ?tapchanger;
+                    cim:SvTapStep.position ?svStep.
+            }
+            BIND(COALESCE(?svStep, ?tcStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             # Phase Tap Changer Tablular
             OPTIONAL {
                 ?tapchanger cim:PhaseTapChangerTabular.PhaseTapChangerTable ?_table.
 
                 ?_tpoint cim:PhaseTapChangerTablePoint.PhaseTapChangerTable ?_table;
-                         cim:TapChangerTablePoint.step ?tcStep;
+                         cim:TapChangerTablePoint.step ?_tcStep;
                          cim:PhaseTapChangerTablePoint.angle ?tcAngle.
 
                 OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?tcRatio. }
-                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?_tr. }
-                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?_tx. }
-                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?_tg. }
-                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?_tb. }
+                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.r ?_tr. }
+                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.x ?_tx. }
+                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.g ?_tg. }
+                OPTIONAL { ?_tpoint cim:TapChangerTablePoint.b ?_tb. }
 
-                filter(xsd:float(?tcStep) = xsd:float(?svStep))
+                filter(xsd:float(?_tcStep) = xsd:float(?step))
             }
 
             # Phase Tap Changer Linear
