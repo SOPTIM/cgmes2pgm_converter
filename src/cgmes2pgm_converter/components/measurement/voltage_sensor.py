@@ -141,12 +141,23 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
         res["meas_type"] = VoltageMeasType.FIELD
+
+        sigma_by_nomv = [
+            self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nomv
+            )
+            for nomv in res["nom_u"]
+        ]
+        missing_sigma_u = res["sigma_u"].isna()
+        res.loc[missing_sigma_u, "sigma_u"] = sigma_by_nomv
+
         return res
 
     def _read_meas_from_default_graph(self):
         args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
         q = self._replace(self._query_meas_in_default, args)
         res = self._source.query(q)
+        res["meas_type"] = VoltageMeasType.FIELD
 
         meas_by_tn = self._join_measurements_by_node(res)
 
@@ -244,7 +255,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
             meas_val = self._get_median_value(meas_u, "u")
 
             value = meas_val["u"]
-            _, sigma = self._use_nominal_voltages.map_kv(nom_u)
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nom_u
+            )
 
             name = meas_val["name"]
             meas = meas_val["meas_u"]
@@ -252,6 +265,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         if value == 0.0:
             # 0 kV is invalid for PGM, derive measurement from nominal voltage
             value, sigma = self._use_nominal_voltages.map_kv(nom_u)
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nom_u
+            )
             meas_type = VoltageMeasType.SUBSTITUTED_NOM_V
 
         return value, sigma, name, meas, meas_type

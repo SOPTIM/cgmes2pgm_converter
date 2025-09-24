@@ -28,14 +28,54 @@ class DefaultSigma:
             Dictionary mapping a Voltage (kV) to a sigma value (MW).
     """
 
-    sigma: float = 10.0
-    discrete: dict[float, float] = field(
-        default_factory=lambda: {380.0: 30.0, 220.0: 20.0}
+    sigma_p_q: float = 10.0
+    discrete_p_q: dict[float, float] = field(
+        default_factory=lambda: {
+            # 420.0: 16.5,
+            # 380.0: 16.5,
+            # 220.0: 5.6,
+            # 150.0: 3.2,
+            # 110.0: 3.2,
+            420.0: 1.5,
+            380.0: 1.5,
+            220.0: 1.1,
+            150.0: 0.8,
+            110.0: 0.8,
+        }
     )
 
-    def get_sigma(self, voltage_level: float) -> float:
+    sigma_u: float = 5.0
+    discrete_u: dict[float, float] = field(
+        default_factory=lambda: {
+            # 420.0: 4.3,
+            # 380.0: 4.3,
+            # 220.0: 1.2,
+            # 150.0: 1.0,
+            # 110.0: 0.8,
+            420.0: 2.0,
+            380.0: 2.0,
+            220.0: 1.2,
+            150.0: 0.5,
+            110.0: 0.5,
+        }
+    )
+
+    def get_sigma_pq(self, voltage_level: float) -> float:
         """Get the sigma value for a given voltage level."""
-        return self.discrete.get(voltage_level, self.sigma)
+        ## TODO: Optimize search with bisect?!
+        sorted_levels = dict(sorted(self.discrete_p_q.items()))
+        for level, sigma in sorted_levels.items():
+            if voltage_level <= level:
+                return sigma
+        return self.sigma_p_q
+
+    def get_sigma_u(self, voltage_level: float) -> float:
+        """Get the sigma value for a given voltage level."""
+        sorted_levels = dict(sorted(self.discrete_u.items()))
+        for level, sigma in sorted_levels.items():
+            if voltage_level <= level:
+                return sigma
+        return self.sigma_u
 
 
 @dataclass

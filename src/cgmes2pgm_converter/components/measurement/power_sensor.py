@@ -38,6 +38,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         SELECT
             (SAMPLE(?_eq) as ?eq)
             (SAMPLE(?_tn) as ?tn)
+            (SAMPLE(?_nomv) as ?nomv)
             ?term
             (SAMPLE(?_eq_type) as ?eq_type)
             (SAMPLE(?_p) as ?p)
@@ -66,6 +67,8 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         ?_eq rdf:type ?_eq_type.
 
         ?term cim:Terminal.TopologicalNode ?_tn.
+
+        ?_tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv.
 
         $TOPO_ISLAND
         #?topoIsland cim:IdentifiedObject.name "Network";
@@ -222,6 +225,18 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
         res["meas_type"] = SymPowerType.FIELD
+
+        sigma_by_nomv = [
+            self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_pq(
+                nomv
+            )
+            for nomv in res["nomv"]
+        ]
+        missing_sigma_p = res["sigma_p"].isna()
+        res.loc[missing_sigma_p, "sigma_p"] = sigma_by_nomv
+
+        missing_sigma_q = res["sigma_q"].isna()
+        res.loc[missing_sigma_q, "sigma_q"] = sigma_by_nomv
 
         return res
 
@@ -619,7 +634,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             meas_val = self._get_median_value(meas_pq, "value")
 
             value = meas_val["value"]
-            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma(
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_pq(
                 nomv
             )
             name = meas_val["name"]
@@ -627,7 +642,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         else:
             # there is no value (e.g. only Q but no P) -> use default value and sigma
             value = 0.0
-            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma(
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_pq(
                 nomv
             )
             is_default = True
