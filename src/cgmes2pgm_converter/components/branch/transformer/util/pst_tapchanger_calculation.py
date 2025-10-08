@@ -207,7 +207,9 @@ def _calc_theta_symmetrical(trafo, tapside):
     #   s = n-n_0
     #   α = 2 * atan(0.5 * s * ∂u)
     #   r = 1
-    steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
+    steps_current = trafo[f"step{tapside}"]
+    steps_neutral = trafo[f"neutralStep{tapside}"]
+    steps = steps_current - steps_neutral
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
 
     # theta = 2.0 * np.arctan(0.5 * steps * voltage_increment/100)
@@ -235,8 +237,10 @@ def _calc_theta_symmetrical(trafo, tapside):
     return theta, k
 
 
-def _calc_theta_k_asymmetrical(trafo, tapside):
-    steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
+def _calc_theta_k_asymmetrical(trafo, tapside: int):
+    steps_current = trafo[f"step{tapside}"]
+    steps_neutral = trafo[f"neutralStep{tapside}"]
+    steps = steps_current - steps_neutral
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
     winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"]
 
@@ -264,18 +268,22 @@ def _calc_theta_k_asymmetrical(trafo, tapside):
 
 def calc_theta_k_asymmetrical_in_phase(
     trafo,
-    tapside,
+    tapside_pst,
     tapside_rtc,
 ):
     ## PST
-    steps = trafo[f"step{tapside}"] - trafo[f"neutralStep{tapside}"]
+    steps_current_pst = trafo[f"step{tapside_pst}"]
+    steps_neutral_pst = trafo[f"neutralStep{tapside_pst}"]
+    steps_pst = steps_current_pst - steps_neutral_pst
 
-    voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
-    winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"]
+    voltage_increment_pst = trafo[f"stepVoltageIncrement{tapside_pst}"]
+    winding_connection_angle = trafo[f"windingConnectionAngle{tapside_pst}"]
 
     ## RTC
 
-    steps_rtc = trafo[f"step{tapside_rtc}_rtc"] - trafo[f"neutralStep{tapside_rtc}_rtc"]
+    steps_current_rtc = trafo[f"step{tapside_rtc}_rtc"]
+    steps_neutral_rtc = trafo[f"neutralStep{tapside_rtc}_rtc"]
+    steps_rtc = steps_current_rtc - steps_neutral_rtc
     voltage_increment_rtc = trafo[f"stepSize{tapside_rtc}"]
 
     u_netz1 = trafo["nomU1"]
@@ -287,9 +295,9 @@ def calc_theta_k_asymmetrical_in_phase(
         rtc_tapside=tapside_rtc,
         rtc_step=steps_rtc,
         rtc_voltage_increment=voltage_increment_rtc,
-        pst_tapside=tapside,
-        pst_step=steps,
-        pst_voltage_increment=voltage_increment,
+        pst_tapside=tapside_pst,
+        pst_step=steps_pst,
+        pst_voltage_increment=voltage_increment_pst,
         winding_connection_angle=winding_connection_angle,
         u_rated1=u_rated1,
         u_rated2=u_rated2,
