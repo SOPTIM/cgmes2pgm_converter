@@ -33,6 +33,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
                 ?tn2
                 ?nomv1
                 ?nomv2
+                ?eq_nomv
                 ?status1
                 ?status2
                 ?type
@@ -47,6 +48,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
             ?line a ?_type;
                     $IN_SERVICE
                     # cim:Equipment.inService "true";
+                    cim:ConductingEquipment.BaseVoltage/cim:BaseVoltage.nominalVoltage ?eq_nomv;
                     cim:IdentifiedObject.name ?name.
 
             BIND(STRAFTER(STR(?_type), "#") AS ?type)

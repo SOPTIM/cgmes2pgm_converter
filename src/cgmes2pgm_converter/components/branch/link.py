@@ -37,6 +37,7 @@ class LinkBuilder(AbstractPgmComponentBuilder):
                 cim:IdentifiedObject.name ?name;
                 $IN_SERVICE
                 # cim:Equipment.inService "true";
+                cim:Switch.retained "true";
                 cim:Switch.open ?open.
 
             BIND(STRAFTER(STR(?_type), "#") AS ?type)
