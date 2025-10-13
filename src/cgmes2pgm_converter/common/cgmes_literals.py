@@ -41,6 +41,9 @@ class Profile(StrEnum):
     SSH = auto()
     """Steady state hypothesis profile"""
 
+    TP = auto()
+    """Topology profile"""
+
     OP = auto()
     """Operational profile"""
 
@@ -49,6 +52,34 @@ class Profile(StrEnum):
 
     MEAS = auto()
     """Measurement profile"""
+
+    UNKNOWN = auto()
+    """Unknown profile"""
+
+    @staticmethod
+    def parse(profile_str: str) -> "Profile":
+        if (
+            "EquipmentBoundary/" in profile_str
+            or "EquipmentBoundary-EU" in profile_str
+            or "BoundaryEquipment" in profile_str
+        ):
+            # no EQ_BD, boundary equipment is just equipment for the EU/ENTSO-E modeling authority set
+            return Profile.EQ
+        elif "TopologyBoundary" in profile_str or "BoundaryTopology" in profile_str:
+            # no TP_BD, boundary topology is just topology for the EU/ENTSO-E modeling authority set
+            return Profile.TP
+        elif "CoreEquipment" in profile_str or "EquipmentCore" in profile_str:
+            return Profile.EQ
+        elif "Topology" in profile_str:
+            return Profile.TP
+        elif "Operation/4.0" in profile_str:
+            return Profile.OP
+        elif "SteadyStateHypothesis" in profile_str:
+            return Profile.SSH
+        elif "StateVariables" in profile_str:
+            return Profile.SV
+        else:
+            return Profile.UNKNOWN
 
 
 class MeasurementValueSource(StrEnum):

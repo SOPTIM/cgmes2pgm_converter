@@ -31,6 +31,90 @@ RDF_PREFIXES = {
 }
 
 
+class NamedGraphs:
+    def __init__(self, base_url: str, default_graph: str = "default"):
+        self.graphs: dict[Profile, set[str]] = {}
+        self.base_url = base_url
+        self.default_graph = default_graph
+
+    def add(self, profile: Profile, graph_name: str, updating: bool = False) -> str:
+        if profile not in self.graphs:
+            self.graphs[profile] = set()
+
+        if graph_name in self.graphs[profile] and not updating:
+            logging.warning(
+                "Graph %s for profile %s already exists.", graph_name, profile
+            )
+        else:
+            logging.debug("Adding graph %s for profile %s.", graph_name, profile)
+            self.graphs[profile].add(graph_name)
+
+        return graph_name
+
+    def determine_graph_name(self, profile: list[Profile], mas: list[str] = []) -> str:
+
+        if len(profile) == 0:
+            return self.default_graph
+
+        mas_sorted = sorted(mas)
+        norm_mas = "_".join([self.normalize_mas(m) for m in mas_sorted])
+
+        if len(profile) == 1:
+            return (
+                self.base_url + "/" + profile[0].name.lower() + "_" + norm_mas.lower()
+            )
+        else:
+            profiles_sorted = sorted(profile, key=lambda p: p.name)
+            profile_part = "_".join(p.name.lower() for p in profiles_sorted)
+            return self.base_url + "/" + profile_part + "_" + norm_mas.lower()
+
+    def get(self, profile: Profile) -> set[str]:
+        return self.graphs.get(profile, set(self.default_graph))
+
+    def has_profiles(self, *profiles: Profile) -> int:
+        """Check if all profiles are available.
+        Returns:
+            * 1 if all profiles are available (can use named graphs)
+            * 0 if no profile is available (can use default graph)
+            * -1 if some profiles are available (distribution mismatch, cannot proceed)
+        """
+
+        check = 0
+        for p in profiles:
+            res = self.graphs.get(p)
+            if res and len(res) > 0:
+                check += 1
+
+        if check == 0:
+            return 0
+        elif check == len(profiles):
+            return 1
+        else:
+            return -1
+
+    def format_for_query(self, profile: Profile) -> str:
+        graphs = self.get(profile)
+        if len(graphs) == 0:
+            return self.default_graph
+        elif len(graphs) == 1:
+            tmp = f"<{list(graphs)[0]}>"
+            return tmp
+        else:
+            tmp = " ".join(f"<{g}>" for g in graphs)
+            return tmp
+
+    def normalize_mas(self, mas: str) -> str:
+        mas2 = mas.split("//")[-1]
+        mas3 = mas2.split("/")[0]
+        mas4 = mas3.split(".")
+        if len(mas4) == 1:
+            return mas4[0]
+        elif len(mas4) > 1:
+            return mas4[-2]
+
+        return mas
+
+
 class CgmesDataset(SparqlDataSource):
     """
     CgmesDataset is a class that extends SparqlDataSource to manage and manipulate CGMES datasets
@@ -56,6 +140,7 @@ class CgmesDataset(SparqlDataSource):
         super().__init__(base_url, rdf_prefixes)
         self.base_url = base_url
         self.graphs = graphs or {}
+        self.named_graphs = NamedGraphs(base_url)
         self.cim_namespace = cim_namespace
 
         for graph in self.graphs.values():
@@ -66,6 +151,18 @@ class CgmesDataset(SparqlDataSource):
             self.graphs[Profile.MEAS] = self.graphs[Profile.OP]
         if (Profile.MEAS in self.graphs) and (Profile.OP not in self.graphs):
             self.graphs[Profile.OP] = self.graphs[Profile.MEAS]
+
+    def update_cim_namespace(self, new_namespace: str) -> bool:
+        """Update the CIM namespace in the dataset and RDF prefixes."""
+        if new_namespace != self.cim_namespace:
+            self.cim_namespace = new_namespace
+            self._prefixes["cim"] = new_namespace
+            logging.info(f"Updated CIM namespace to: {new_namespace}")
+            return True
+        else:
+            logging.debug("CIM namespace unchanged.")
+            pass
+        return False
 
     def drop_profile(self, profile: Profile) -> None:
         """Drop the RDF graph associated with the specified profile."""
