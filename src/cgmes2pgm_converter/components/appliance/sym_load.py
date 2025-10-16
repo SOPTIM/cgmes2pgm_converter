@@ -15,6 +15,8 @@
 import numpy as np
 from power_grid_model import ComponentType, LoadGenType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from ..component import AbstractPgmComponentBuilder
 
 
@@ -56,13 +58,83 @@ class SymLoadBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?EnergyConsumer
     """
 
-    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+    _query_graph = """
+        SELECT DISTINCT ?topologicalNode ?name ?connected ?EnergyConsumer ?p ?q ?type ?terminal
+        WHERE
+        {
+            VALUES ?_type {
+                cim:EnergyConsumer
+                cim:ConformLoad
+                cim:NonConformLoad
+                cim:StationSupply
+                cim:AsynchronousMachine
+            }
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?EnergyConsumer rdf:type ?_type;
+                                cim:IdentifiedObject.name ?name.
+
+                ?terminal a cim:Terminal;
+                            cim:Terminal.ConductingEquipment ?EnergyConsumer.
+            }
+            BIND(STRAFTER(STR(?_type), "#") AS ?type)
+
+            VALUES ?ssh_graph { $SSH_GRAPH }
+            VALUES ?ssh_graph2 { $SSH_GRAPH }
+            GRAPH ?ssh_graph {
+                ?terminal cim:ACDCTerminal.connected ?connected.
+            }
+
+            $IN_SERVICE
+            # GRAPH ?ssh_graph { ?EnergyConsumer cim:Equipment.inService "true"; }
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyConsumer cim:EnergyConsumer.p ?p.
+                    ?EnergyConsumer cim:EnergyConsumer.q ?q.
+                }
+            }
+            OPTIONAL {
+                GRAPH ?ssh_graph2 {
+                    ?EnergyConsumer cim:RotatingMachine.p ?p.
+                    ?EnergyConsumer cim:RotatingMachine.q ?q.
+                }
+            }
+
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?terminal cim:Terminal.TopologicalNode ?topologicalNode.
+            }
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
         }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+        ORDER BY ?EnergyConsumer
+    """
+
+    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$IN_SERVICE": self._in_service_graph("?EnergyConsumer"),
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?topologicalNode"),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                # "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         # Mw, MVar to W, Var
         res["p"] = res["p"] * 1e6

@@ -15,6 +15,8 @@
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from .line import LineBuilder
 
 
@@ -29,14 +31,27 @@ class EquivalentBranchBuilder(LineBuilder):
     """
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
-            "$NOMV_FILTER": "FILTER(?nomv1 != ?nomv2)",  # <- filter for different voltage levels
-        }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
+                "$IN_SERVICE": self._in_service_graph("?line"),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+                "$NOMV_FILTER": "FILTER(?nomv1 != ?nomv2)",  # <- filter for different voltage levels
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
+                "$NOMV_FILTER": "FILTER(?nomv1 != ?nomv2)",  # <- filter for different voltage levels
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         arr = initialize_array(self._data_type, self.component_name(), res.shape[0])
         arr["id"] = self._id_mapping.add_cgmes_iris(res["line"], res["name"])

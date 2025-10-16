@@ -17,6 +17,8 @@ import logging
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from .component import AbstractPgmComponentBuilder
 
 
@@ -66,10 +68,67 @@ class NodeBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?tn
     """
 
+    _query_in_graph = """
+        SELECT DISTINCT ?tn ?name ?voltage ?_bv ?substationName ?substation ?containerType ?container ?containerName ?island_name
+        WHERE {
+
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?tn a cim:TopologicalNode;
+                    cim:TopologicalNode.ConnectivityNodeContainer ?container;
+                    cim:TopologicalNode.BaseVoltage ?_bv;
+                    cim:IdentifiedObject.name ?name.
+            }
+
+            VALUES ?eq_graph_container { $EQ_GRAPH }
+            GRAPH ?eq_graph_container {
+                ?container a ?containerType.
+                ?container cim:IdentifiedObject.name ?containerName.
+
+                OPTIONAL {
+                    ?container      a cim:Bay;
+                                    cim:Bay.VoltageLevel ?voltageLevel.
+                    ?voltageLevel   cim:VoltageLevel.Substation ?substation.
+                    ?substation     cim:IdentifiedObject.name ?substationName.
+                }
+
+                OPTIONAL {
+                    ?container  a cim:VoltageLevel;
+                                cim:VoltageLevel.Substation ?substation.
+                    ?substation cim:IdentifiedObject.name ?substationName.
+                }
+            }
+
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv {
+                ?_bv cim:BaseVoltage.nominalVoltage ?_nv1.
+            }
+            BIND(COALESCE(?_nv1, -1) AS ?voltage)
+
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland cim:IdentifiedObject.name ?island_name;
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn;
+            # }
+        }
+        ORDER BY ?tn
+    """
+
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
-        q = self._replace(self._query, args)
-        query_result = self._source.query(q)
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+            }
+            q = self._replace(self._query_in_graph, args)
+            query_result = self._source.query(q)
+        else:
+            args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
+            q = self._replace(self._query, args)
+            query_result = self._source.query(q)
 
         arr = initialize_array(
             self._data_type, self.component_name(), query_result.shape[0]

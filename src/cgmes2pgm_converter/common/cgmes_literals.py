@@ -74,6 +74,8 @@ class Profile(StrEnum):
             return Profile.TP
         elif "Operation/4.0" in profile_str:
             return Profile.OP
+        elif "OperationMeas/4.0" in profile_str:
+            return Profile.MEAS
         elif "SteadyStateHypothesis" in profile_str:
             return Profile.SSH
         elif "StateVariables" in profile_str:

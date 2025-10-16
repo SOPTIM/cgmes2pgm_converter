@@ -14,6 +14,7 @@
 
 
 import logging
+from typing import override
 
 import pandas as pd
 
@@ -30,16 +31,45 @@ RDF_PREFIXES = {
     "dm": "http://iec.ch/TC57/61970-552/DifferenceModel/1#",
 }
 
+fullmodel_base_query = """
+    ?fullModel a md:FullModel;
+        md:Model.profile ?profile;
+        md:Model.scenarioTime ?scenarioTime;
+        md:Model.description ?description.
+
+    OPTIONAL {
+        ?fullModel a md:FullModel;
+            md:Model.modelingAuthoritySet ?_mas.
+    }
+    BIND(COALESCE(?_mas, "<no modelingAuthoritySet>") AS ?mas)
+"""
+
+fullmodel_query = f"""
+    SELECT ?fullModel ?profile ?mas ?scenarioTime ?description ?graph
+    WHERE {{
+        {{
+            {fullmodel_base_query}
+            BIND("" AS ?graph)
+        }}
+        UNION {{
+            GRAPH ?graph {{  {fullmodel_base_query} }}
+        }}
+    }}
+"""
+
 
 class NamedGraphs:
     def __init__(self, base_url: str, default_graph: str = "default"):
         self.graphs: dict[Profile, set[str]] = {}
+        self._graph_names: dict[str, set[Profile]] = {}
         self.base_url = base_url
         self.default_graph = default_graph
 
     def add(self, profile: Profile, graph_name: str, updating: bool = False) -> str:
         if profile not in self.graphs:
             self.graphs[profile] = set()
+        if graph_name not in self._graph_names:
+            self._graph_names[graph_name] = set()
 
         if graph_name in self.graphs[profile] and not updating:
             logging.warning(
@@ -48,8 +78,29 @@ class NamedGraphs:
         else:
             logging.debug("Adding graph %s for profile %s.", graph_name, profile)
             self.graphs[profile].add(graph_name)
+            self._graph_names[graph_name].add(profile)
 
         return graph_name
+
+    def remove_profile(self, profile: Profile) -> None:
+        names = self.graphs.pop(profile, set())
+        for name in names:
+            profiles = self._graph_names.get(name)
+            if profiles:
+                profiles.discard(profile)
+                if not profiles:
+                    # remove whole entry if no profiles left
+                    self._graph_names.pop(name)
+
+    def remove_graph(self, graph_name: str) -> None:
+        profiles = self._graph_names.pop(graph_name, set())
+        for profile in profiles:
+            graphs = self.graphs.get(profile)
+            if graphs:
+                graphs.discard(graph_name)
+                if not graphs:
+                    # remove whole entry if no graphs left
+                    self.graphs.pop(profile)
 
     def determine_graph_name(self, profile: list[Profile], mas: list[str] = []) -> str:
 
@@ -69,33 +120,12 @@ class NamedGraphs:
             return self.base_url + "/" + profile_part + "_" + norm_mas.lower()
 
     def get(self, profile: Profile) -> set[str]:
-        return self.graphs.get(profile, set(self.default_graph))
-
-    def has_profiles(self, *profiles: Profile) -> int:
-        """Check if all profiles are available.
-        Returns:
-            * 1 if all profiles are available (can use named graphs)
-            * 0 if no profile is available (can use default graph)
-            * -1 if some profiles are available (distribution mismatch, cannot proceed)
-        """
-
-        check = 0
-        for p in profiles:
-            res = self.graphs.get(p)
-            if res and len(res) > 0:
-                check += 1
-
-        if check == 0:
-            return 0
-        elif check == len(profiles):
-            return 1
-        else:
-            return -1
+        return self.graphs.get(profile, set())
 
     def format_for_query(self, profile: Profile) -> str:
         graphs = self.get(profile)
         if len(graphs) == 0:
-            return self.default_graph
+            return ""
         elif len(graphs) == 1:
             tmp = f"<{list(graphs)[0]}>"
             return tmp
@@ -126,31 +156,23 @@ class CgmesDataset(SparqlDataSource):
             - CGMES 2: "http://iec.ch/TC57/2013/CIM-schema-cim16#"
             - CGMES 3: "http://iec.ch/TC57/CIM100#"
         graphs (dict[Profile, str]): A dictionary mapping profiles to their RDF graph URIs
+        split_profiles (bool): Whether to split profiles into separate graphs
     """
 
     def __init__(
         self,
         base_url: str,
         cim_namespace: str,
-        graphs: dict[Profile, str] | None = None,
+        split_profiles: bool = False,
     ):
         rdf_prefixes = RDF_PREFIXES.copy()
         rdf_prefixes["cim"] = cim_namespace
 
         super().__init__(base_url, rdf_prefixes)
         self.base_url = base_url
-        self.graphs = graphs or {}
         self.named_graphs = NamedGraphs(base_url)
+        self.split_profiles = split_profiles
         self.cim_namespace = cim_namespace
-
-        for graph in self.graphs.values():
-            if graph.strip() == "":
-                raise ValueError("Named Graph cannot be empty.")
-
-        if (Profile.OP in self.graphs) and (Profile.MEAS not in self.graphs):
-            self.graphs[Profile.MEAS] = self.graphs[Profile.OP]
-        if (Profile.MEAS in self.graphs) and (Profile.OP not in self.graphs):
-            self.graphs[Profile.OP] = self.graphs[Profile.MEAS]
 
     def update_cim_namespace(self, new_namespace: str) -> bool:
         """Update the CIM namespace in the dataset and RDF prefixes."""
@@ -166,12 +188,41 @@ class CgmesDataset(SparqlDataSource):
 
     def drop_profile(self, profile: Profile) -> None:
         """Drop the RDF graph associated with the specified profile."""
-        self.drop_graph(self._get_profile_uri(profile))
+        for g in self._get_profile_uri(profile):
+            self.drop_graph(g)
+        self.named_graphs.remove_profile(profile)
+
+    @override
+    def drop_graph(self, graph_iri: str) -> None:
+        super().drop_graph(graph_iri)
+        self.named_graphs.remove_graph(graph_iri)
 
     def mrid_to_urn(self, mrid: str) -> str:
         """Convert an mRID (Master Resource Identifier) to its iri in the dataset."""
         mrid = mrid.replace('"', "")
         return f"<urn:uuid:{mrid}>"
+
+    def populate_named_graph_mapping(self):
+        # read fullmodels from all graphs
+        dataset_profiles = self.query(fullmodel_query)
+
+        named_graphs = self.named_graphs
+        for idx, item in dataset_profiles.iterrows():
+
+            graph_name = item["g"]
+            profile_str = item["profile"]
+            profile = Profile.parse(profile_str)
+            if profile != Profile.UNKNOWN:
+                named_graphs.add(profile, graph_name, updating=False)
+
+        if (named_graphs.graphs.get(Profile.OP)) and (
+            not named_graphs.graphs.get(Profile.MEAS)
+        ):
+            named_graphs.graphs[Profile.MEAS] = named_graphs.graphs[Profile.OP]
+        if (named_graphs.graphs.get(Profile.MEAS)) and (
+            not named_graphs.graphs.get(Profile.OP)
+        ):
+            named_graphs.graphs[Profile.OP] = named_graphs.graphs[Profile.MEAS]
 
     def query(
         self, query: str, add_prefixes=True, remove_uuid_base_uri=True
@@ -197,7 +248,17 @@ class CgmesDataset(SparqlDataSource):
             profile (Profile | str): The profile or URI of the graph to insert the DataFrame into.
             include_mrid (bool, optional): Include the mRID in the triples. Defaults to True.
         """
-        profile_uri = self._get_profile_uri(profile)
+        profile_uris = self._get_profile_uri(profile)
+        if len(profile_uris) == 0:
+            raise ValueError(
+                f"Profile {profile} has no named graph assigned, cannot insert DataFrame."
+            )
+        elif len(profile_uris) > 1:
+            raise ValueError(
+                f"Profile {profile} has multiple named graphs assigned, cannot insert DataFrame."
+            )
+
+        profile_uri = profile_uris[0]
 
         logging.debug(
             "Inserting %s triples into %s",
@@ -236,13 +297,20 @@ class CgmesDataset(SparqlDataSource):
 
             triples += [f"{uri} {col} {row}." for uri, row in zip(uris, df[col])]
 
-        insert_query = f"""
-            INSERT DATA {{
-                GRAPH <{graph}> {{
+        if graph == "default":
+            insert_query = f"""
+                INSERT DATA {{
                     {"".join(triples)}
                 }}
-            }}
-        """
+            """
+        else:
+            insert_query = f"""
+                INSERT DATA {{
+                    GRAPH <{graph}> {{
+                        {"".join(triples)}
+                    }}
+                }}
+            """
         self.update(insert_query)
 
     def insert_triples(
@@ -275,7 +343,16 @@ class CgmesDataset(SparqlDataSource):
         self, triples: list[tuple[str, str, str]], profile: Profile | str
     ):
 
-        profile_uri = self._get_profile_uri(profile)
+        profile_uris = self._get_profile_uri(profile)
+        if len(profile_uris) == 0:
+            raise ValueError(
+                f"Profile {profile} has no named graph assigned, cannot insert triples."
+            )
+        elif len(profile_uris) > 1:
+            raise ValueError(
+                f"Profile {profile} has multiple named graphs assigned, cannot insert triples."
+            )
+        profile_uri = profile_uris[0]
         triples_str = []
 
         for subject, predicate, obj in triples:
@@ -297,5 +374,8 @@ class CgmesDataset(SparqlDataSource):
             """
         self.update(insert_query)
 
-    def _get_profile_uri(self, profile: Profile | str) -> str:
-        return self.graphs[profile] if isinstance(profile, Profile) else profile
+    def _get_profile_uri(self, profile: Profile | str) -> list[str]:
+        if isinstance(profile, Profile):
+            return list(self.named_graphs.get(profile))
+        else:
+            return [profile]

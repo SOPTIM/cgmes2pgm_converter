@@ -15,6 +15,8 @@
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from ..component import AbstractPgmComponentBuilder
 
 
@@ -24,6 +26,91 @@ class SourceBuilder(AbstractPgmComponentBuilder):
     with the lowest reference priority != 0 to a Source component.
 
     One sym_gen component is removed and an source component is created
+    """
+
+    _default_query = """
+        SELECT ?EnergyProducer ?ref ?uref
+        WHERE {
+            VALUES ?type { cim:ExternalNetworkInjection cim:SynchronousMachine}
+            ?EnergyProducer a ?type.
+
+            OPTIONAL { ?EnergyProducer cim:SynchronousMachine.referencePriority ?_RefS. }
+            OPTIONAL { ?EnergyProducer cim:ExternalNetworkInjection.referencePriority ?_RefE.}
+            BIND(COALESCE(?_RefS, ?_RefE) AS ?ref)
+
+            ?EnergyProducer $IN_SERVICE
+                            # cim:Equipment.inService "true";
+                            cim:Equipment.EquipmentContainer ?_voltLevel.
+
+            ?_voltLevel cim:VoltageLevel.BaseVoltage ?_baseVoltage.
+            ?_baseVoltage cim:BaseVoltage.nominalVoltage ?uref.
+
+            ?terminal a cim:Terminal;
+                        cim:Terminal.ConductingEquipment ?EnergyProducer;
+                        cim:Terminal.TopologicalNode ?topologicalNode;
+                        cim:ACDCTerminal.connected "true".
+
+            $TOPO_ISLAND
+            #?topoIsland cim:IdentifiedObject.name "Network";
+            #            cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+        }
+        ORDER BY ASC(?ref) ?EnergyProducer
+    """
+
+    _graph_query = """
+        SELECT ?EnergyProducer ?ref ?uref
+        WHERE {
+            VALUES ?type { cim:ExternalNetworkInjection cim:SynchronousMachine}
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?EnergyProducer a ?type.
+
+                ?EnergyProducer cim:Equipment.EquipmentContainer ?_voltLevel.
+                ?_voltLevel cim:VoltageLevel.BaseVoltage ?_baseVoltage.
+
+                ?terminal a cim:Terminal;
+                            cim:Terminal.ConductingEquipment ?EnergyProducer.
+            }
+
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv {
+                ?_baseVoltage cim:BaseVoltage.nominalVoltage ?uref.
+            }
+
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?terminal cim:Terminal.TopologicalNode ?topologicalNode.
+            }
+
+            $IN_SERVICE
+            # GRAPH ?ssh_graph {
+            #     ?EnergyProducer cim:Equipment.inService "true".
+            # }
+
+            VALUES ?ssh_graph { $SSH_GRAPH }
+            GRAPH ?ssh_graph {
+                ?terminal cim:ACDCTerminal.connected "true".
+            }
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:SynchronousMachine.referencePriority ?_RefS.
+                }
+            }
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:ExternalNetworkInjection.referencePriority ?_RefE.
+                }
+            }
+            BIND(COALESCE(?_RefS, ?_RefE) AS ?ref)
+
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #             cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
+        }
+        ORDER BY ASC(?ref) ?EnergyProducer
     """
 
     def is_active(self):
@@ -55,40 +142,25 @@ class SourceBuilder(AbstractPgmComponentBuilder):
         return sources, extra_info
 
     def get_source(self) -> tuple[int, float]:
-        query = """
-            SELECT ?EnergyProducer ?ref ?uref
-            WHERE {
-                VALUES ?type { cim:ExternalNetworkInjection cim:SynchronousMachine}
-                ?EnergyProducer a ?type.
-
-                OPTIONAL { ?EnergyProducer cim:SynchronousMachine.referencePriority ?_RefS. }
-                OPTIONAL { ?EnergyProducer cim:ExternalNetworkInjection.referencePriority ?_RefE.}
-                BIND(COALESCE(?_RefS, ?_RefE) AS ?ref)
-
-                ?EnergyProducer $IN_SERVICE
-                                # cim:Equipment.inService "true";
-                                cim:Equipment.EquipmentContainer ?_voltLevel.
-
-                ?_voltLevel cim:VoltageLevel.BaseVoltage ?_baseVoltage.
-                ?_baseVoltage cim:BaseVoltage.nominalVoltage ?uref.
-
-                ?terminal a cim:Terminal;
-                            cim:Terminal.ConductingEquipment ?EnergyProducer;
-                            cim:Terminal.TopologicalNode ?topologicalNode;
-                            cim:ACDCTerminal.connected "true".
-
-                $TOPO_ISLAND
-                #?topoIsland cim:IdentifiedObject.name "Network";
-                #            cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$IN_SERVICE": self._in_service_graph("?EnergyProducer"),
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?topologicalNode"),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
             }
-            ORDER BY ASC(?ref) ?EnergyProducer
-        """
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
-        }
-        q = self._replace(query, args)
-        res = self._source.query(q)
+            q = self._replace(self._graph_query, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+            }
+            q = self._replace(self._default_query, args)
+            res = self._source.query(q)
 
         if res.shape[0] == 0:
             raise ValueError(

@@ -227,7 +227,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
     def _read_meas_from_named_graph(self):
         args = {
             "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
+            "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
         }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)

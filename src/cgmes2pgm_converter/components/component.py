@@ -77,6 +77,11 @@ class AbstractPgmComponentBuilder(ABC):
             return 'cim:Equipment.inService "true";'
         return ""
 
+    def _in_service_graph(self, equipment_var: str, graph_var: str = "?ssh_graph"):
+        if self._source.cim_namespace == "http://iec.ch/TC57/CIM100#":
+            return f"GRAPH {graph_var} {{ {equipment_var} cim:Equipment.inService 'true'. }} "
+        return ""
+
     def _at_topo_island_node(self, node1, node2=None):
         options = self._converter_options
         if options.only_topo_island is True or options.topo_island_name is not None:
@@ -90,6 +95,14 @@ class AbstractPgmComponentBuilder(ABC):
 
             stmt += "."
             return stmt
+        return ""
+
+    def _at_topo_island_node_graph(
+        self, node1, node2=None, graph_var: str = "?sv_graph"
+    ):
+        tmp = self._at_topo_island_node(node1, node2)
+        if tmp:
+            return f"GRAPH {graph_var} {{ {tmp} }} "
         return ""
 
     def _replace(self, query: str, query_params: dict):

@@ -50,6 +50,7 @@ class DcAsLoadBuilder(AbstractPgmComponentBuilder):
     """
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
+        # TODO: read from named graphs too
         args = {
             "$IN_SERVICE": self._in_service(),
             "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
