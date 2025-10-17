@@ -111,6 +111,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
                 ?tn2
                 ?nomv1
                 ?nomv2
+                ?eq_nomv
                 ?status1
                 ?status2
                 ?type
@@ -126,6 +127,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
             VALUES ?eq_graph { $EQ_GRAPH }
             GRAPH ?eq_graph {
                 ?line a ?_type;
+                    cim:ConductingEquipment.BaseVoltage ?eq_bv;
                     cim:IdentifiedObject.name ?name.
 
                 ?term1 a cim:Terminal;
@@ -168,6 +170,10 @@ class LineBuilder(AbstractPgmComponentBuilder):
             VALUES ?eq_graph_bv2 { $EQ_GRAPH }
             GRAPH ?eq_graph_bv2 {
                ?_bv2 cim:BaseVoltage.nominalVoltage ?nomv2.
+            }
+            VALUES ?eq_graph_bv3 { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv3 {
+                ?eq_bv cim:BaseVoltage.nominalVoltage ?eq_nomv
             }
 
             $TOPO_ISLAND

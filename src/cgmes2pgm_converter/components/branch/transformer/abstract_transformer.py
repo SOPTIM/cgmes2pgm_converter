@@ -128,7 +128,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
     """
 
     _query_graph = """
-        SELECT ?tr ?name ?_term ?trEnd ?node ?connectionType ?r ?x ?g ?b ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_table
+        SELECT ?tr ?name ?_term ?trEnd ?node ?connectionType ?r ?x ?g ?b ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_ratiotap_type
         WHERE {
             {
                 SELECT ?tr (COUNT(?_trEnd) as ?n) (SAMPLE(?_name) as ?name)
