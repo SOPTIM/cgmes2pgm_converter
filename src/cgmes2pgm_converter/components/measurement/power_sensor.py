@@ -36,74 +36,67 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
     _query_meas_in_graph = """
         SELECT
-            (SAMPLE(?_eq) as ?eq)
-            (SAMPLE(?_tn) as ?tn)
-            (SAMPLE(?_nomv) as ?nomv)
+            ?eq
+            ?tn
+            ?nomv
             ?term
-            (SAMPLE(?_eq_type) as ?eq_type)
-            (SAMPLE(?_p) as ?p)
-            (SAMPLE(?_q) as ?q)
-            (SAMPLE(?_acc_p) as ?acc_p)
-            (SAMPLE(?_acc_q) as ?acc_q)
-            (SAMPLE(?_sigma_p) as ?sigma_p)
-            (SAMPLE(?_sigma_q) as ?sigma_q)
-            (SAMPLE(?_name_p) as ?name_p)
-            (SAMPLE(?_name_q) as ?name_q)
-            (SAMPLE(?_meas_p) as ?meas_p)
-            (SAMPLE(?_meas_q) as ?meas_q)
+            ?value
+            ?sigma
+            ?acc
+            ?name
+            ?meas
+            ?pfi
         WHERE {
+            # VALUES ?measurementType { "ThreePhaseActivePower" # "ThreePhaseReactivePower" }
             VALUES ?op_graph { $OP_GRAPH }
             GRAPH ?op_graph {
-                ?_meas_p cim:Measurement.measurementType ?_type_p;
-                        cim:IdentifiedObject.name ?_name_p;
-                        cim:Measurement.PowerSystemResource ?_eq;
-                        cim:Measurement.Terminal ?term.
-
-                ?_measVal_p cim:AnalogValue.Analog ?_meas_p.
-                OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorAccuracy ?_acc_p. }
-                OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorSigma ?_sigma_p. }
-
+                ?meas cim:Measurement.measurementType $MEASUREMENT_TYPE;
+                    cim:IdentifiedObject.name ?name;
+                    cim:Measurement.Terminal ?term.
+                OPTIONAL {
+                    ?meas cim:Analog.positiveFlowIn ?_pfi.
+                }
+                BIND(COALESCE(?_pfi, "false") AS ?pfi)
             }
-            FILTER(?_type_p = "ThreePhaseActivePower")
-
-            VALUES ?eq_graph { $EQ_GRAPH }
-            GRAPH ?eq_graph {
-                ?_eq rdf:type ?_eq_type.
-			# TODO: ...
-        	?_tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv.
-            }
-
-            GRAPH ?op_graph {
-                ?_meas_q cim:Measurement.measurementType ?_type_q;
-                        cim:IdentifiedObject.name ?_name_q;
-                        cim:Measurement.PowerSystemResource ?_eq;
-                        cim:Measurement.Terminal ?term.
-
-                ?_meas_val_q cim:AnalogValue.Analog ?_meas_q.
-                OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorAccuracy ?_acc_q. }
-                OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorSigma ?_sigma_q. }
-            }
-            FILTER(?_type_q = "ThreePhaseReactivePower")
 
             VALUES ?meas_graph { $MEAS_GRAPH }
             GRAPH ?meas_graph {
-                ?_measVal_p cim:AnalogValue.value ?_p.
-            }
-            GRAPH ?meas_graph {
-                ?_meas_val_q cim:AnalogValue.value ?_q.
+                ?_measVal_scada cim:AnalogValue.Analog ?meas;
+                                cim:AnalogValue.value ?value.
+
+                OPTIONAL {
+                    ?_measVal_scada cim:MeasurementValue.sensorAccuracy ?acc.
+                }
+
+                OPTIONAL {
+                    ?_measVal_scada cim:MeasurementValue.sensorSigma ?sigma.
+                }
             }
 
             VALUES ?tp_graph { $TP_GRAPH }
             GRAPH ?tp_graph {
-                ?term cim:Terminal.TopologicalNode ?_tn.
+                ?term cim:Terminal.TopologicalNode ?tn.
             }
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?term cim:Terminal.ConductingEquipment ?eq.
+            }
+
+            VALUES ?tp_graph_bv { $TP_GRAPH }
+            GRAPH ?tp_graph_bv {
+                ?tn cim:TopologicalNode.BaseVoltage ?bv.
+            }
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv {
+                ?bv cim:BaseVoltage.nominalVoltage ?nomv.
+            }
+
             $TOPO_ISLAND
             # GRAPH ?sv_graph {
             #     ?topoIsland # cim:IdentifiedObject.name "Network";
-            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn.
             # }
         }
-        GROUP BY ?term
         ORDER BY ?term
     """
 
@@ -227,6 +220,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
     def _read_meas_from_graph(self):
         args = {
             "$TOPO_ISLAND": self._at_topo_island_node_graph("?_tn"),
+            "$MEASUREMENT_TYPE": '"ThreePhaseActivePower"',
             "$EQ_GRAPH": self._source.named_graphs.format_for_query(Profile.EQ),
             "$SSH_GRAPH": self._source.named_graphs.format_for_query(Profile.SSH),
             "$TP_GRAPH": self._source.named_graphs.format_for_query(Profile.TP),
@@ -234,23 +228,14 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             "$OP_GRAPH": self._source.named_graphs.format_for_query(Profile.OP),
             "$MEAS_GRAPH": self._source.named_graphs.format_for_query(Profile.MEAS),
         }
-        q = self._replace(self._query_meas_in_graph, args)
-        res = self._source.query(q)
-        res["meas_type"] = SymPowerType.FIELD
+        # Read active power measurements
+        q_p = self._replace(self._query_meas_in_graph, args)
 
-        sigma_by_nomv = [
-            self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_pq(
-                nomv
-            )
-            for nomv in res["nomv"]
-        ]
-        missing_sigma_p = res["sigma_p"].isna()
-        res.loc[missing_sigma_p, "sigma_p"] = sigma_by_nomv
+        # Read reactive power measurements
+        args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
+        q_q = self._replace(self._query_meas_in_graph, args)
 
-        missing_sigma_q = res["sigma_q"].isna()
-        res.loc[missing_sigma_q, "sigma_q"] = sigma_by_nomv
-
-        return res
+        return self._read_meas_from_default_query(q_p, q_q)
 
     def _read_meas_from_default_graph(self):
         args = {
@@ -259,14 +244,21 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         }
         # Read active power measurements
         q_p = self._replace(self._query_meas_in_default, args)
+
+        # Read reactive power measurements
+        args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
+        q_q = self._replace(self._query_meas_in_default, args)
+
+        return self._read_meas_from_default_query(q_p, q_q)
+
+    def _read_meas_from_default_query(self, q_p, q_q):
+        # # Read active power measurements
         res_p = self._source.query(q_p)
 
         # Invert Measurement if "positiveFlowIn" is set to true
         res_p["value"] = res_p["value"].where(~res_p["pfi"], res_p["value"] * -1)
 
         # Read reactive power measurements
-        args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
-        q_q = self._replace(self._query_meas_in_default, args)
         res_q = self._source.query(q_q)
 
         # Invert Measurement if "positiveFlowIn" is set to true
