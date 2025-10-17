@@ -52,48 +52,56 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             (SAMPLE(?_meas_p) as ?meas_p)
             (SAMPLE(?_meas_q) as ?meas_q)
         WHERE {
-        GRAPH <$OP_GRAPH> {
-            ?_meas_p cim:Measurement.measurementType ?_type_p;
-                    cim:IdentifiedObject.name ?_name_p;
-                    cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Measurement.Terminal ?term.
+            VALUES ?op_graph { $OP_GRAPH }
+            GRAPH ?op_graph {
+                ?_meas_p cim:Measurement.measurementType ?_type_p;
+                        cim:IdentifiedObject.name ?_name_p;
+                        cim:Measurement.PowerSystemResource ?_eq;
+                        cim:Measurement.Terminal ?term.
 
-            ?_measVal_p cim:AnalogValue.Analog ?_meas_p.
-            OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorAccuracy ?_acc_p. }
-            OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorSigma ?_sigma_p. }
-        }
-        FILTER(?_type_p = "ThreePhaseActivePower")
+                ?_measVal_p cim:AnalogValue.Analog ?_meas_p.
+                OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorAccuracy ?_acc_p. }
+                OPTIONAL { ?_measVal_p cim:MeasurementValue.sensorSigma ?_sigma_p. }
 
-        ?_eq rdf:type ?_eq_type.
+            }
+            FILTER(?_type_p = "ThreePhaseActivePower")
 
-        ?term cim:Terminal.TopologicalNode ?_tn.
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?_eq rdf:type ?_eq_type.
+			# TODO: ...
+        	?_tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv.
+            }
 
-        ?_tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?_nomv.
+            GRAPH ?op_graph {
+                ?_meas_q cim:Measurement.measurementType ?_type_q;
+                        cim:IdentifiedObject.name ?_name_q;
+                        cim:Measurement.PowerSystemResource ?_eq;
+                        cim:Measurement.Terminal ?term.
 
-        $TOPO_ISLAND
-        #?topoIsland cim:IdentifiedObject.name "Network";
-        #            cim:TopologicalIsland.TopologicalNodes ?_tn.
+                ?_meas_val_q cim:AnalogValue.Analog ?_meas_q.
+                OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorAccuracy ?_acc_q. }
+                OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorSigma ?_sigma_q. }
+            }
+            FILTER(?_type_q = "ThreePhaseReactivePower")
 
-        GRAPH <$OP_GRAPH> {
-            ?_meas_q cim:Measurement.measurementType ?_type_q;
-                    cim:IdentifiedObject.name ?_name_q;
-                    cim:Measurement.PowerSystemResource ?_eq;
-                    cim:Measurement.Terminal ?term.
+            VALUES ?meas_graph { $MEAS_GRAPH }
+            GRAPH ?meas_graph {
+                ?_measVal_p cim:AnalogValue.value ?_p.
+            }
+            GRAPH ?meas_graph {
+                ?_meas_val_q cim:AnalogValue.value ?_q.
+            }
 
-    		?_meas_val_q cim:AnalogValue.Analog ?_meas_q.
-    		OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorAccuracy ?_acc_q. }
-    		OPTIONAL { ?_meas_val_q cim:MeasurementValue.sensorSigma ?_sigma_q. }
-        }
-        FiLTER(?_type_q = "ThreePhaseReactivePower")
-
-        GRAPH <$MEAS_GRAPH> {
-            ?_measVal_p cim:AnalogValue.value ?_p.
-        }
-
-        GRAPH <$MEAS_GRAPH> {
-            ?_meas_val_q cim:AnalogValue.value ?_q.
-        }
-
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?term cim:Terminal.TopologicalNode ?_tn.
+            }
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
         }
         GROUP BY ?term
         ORDER BY ?term
@@ -139,16 +147,16 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             ?tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nomv.
 
             $TOPO_ISLAND
-            #?topoIsland # cim:IdentifiedObject.name "TODO";
-            #        cim:TopologicalIsland.TopologicalNodes ?tn.
-
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn.
+            # }
         }
         ORDER BY ?term
     """
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
-        if Profile.OP in self._source.graphs:
+        if self._source.split_profiles:
             res = self._read_meas_from_graph()
         else:
             res = self._read_meas_from_default_graph()
@@ -218,9 +226,13 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
 
     def _read_meas_from_graph(self):
         args = {
-            "$TOPO_ISLAND": self._at_topo_island_node("?_tn"),
-            "$OP_GRAPH": self._source.graphs[Profile.OP],
-            "$MEAS_GRAPH": self._source.graphs[Profile.MEAS],
+            "$TOPO_ISLAND": self._at_topo_island_node_graph("?_tn"),
+            "$EQ_GRAPH": self._source.named_graphs.format_for_query(Profile.EQ),
+            "$SSH_GRAPH": self._source.named_graphs.format_for_query(Profile.SSH),
+            "$TP_GRAPH": self._source.named_graphs.format_for_query(Profile.TP),
+            "$SV_GRAPH": self._source.named_graphs.format_for_query(Profile.SV),
+            "$OP_GRAPH": self._source.named_graphs.format_for_query(Profile.OP),
+            "$MEAS_GRAPH": self._source.named_graphs.format_for_query(Profile.MEAS),
         }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)

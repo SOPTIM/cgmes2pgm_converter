@@ -17,6 +17,8 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from ...component import AbstractPgmComponentBuilder
 
 
@@ -66,7 +68,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                                 cim:TapChanger.neutralU ?neutralU.
 
             OPTIONAL {
-                ?_ratiotapchanger cim:TapChanger.step ?tcStep;
+                ?_ratiotapchanger cim:TapChanger.step ?sshStep;
             }
 
             OPTIONAL {
@@ -74,7 +76,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                     cim:SvTapStep.position ?svStep.
             }
 
-            BIND(COALESCE(?svStep, ?tcStep, ?normalStep, ?neutralStep, "0") as ?step)
+            BIND(COALESCE(?svStep, ?sshStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             OPTIONAL {
                 ?_ratiotapchanger cim:RatioTapChanger.RatioTapChangerTable ?_table.
@@ -120,6 +122,134 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
 
         BIND(COALESCE(?_phasetapchanger, ?_ratiotapchanger) as ?tapchanger)
         BIND(COALESCE(?_phasetap_type, ?_ratiotap_type) as ?taptype)
+
+        }
+        ORDER BY ?tr ?endNumber
+    """
+
+    _query_graph = """
+        SELECT ?tr ?name ?_term ?trEnd ?node ?connectionType ?r ?x ?g ?b ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_table
+        WHERE {
+            {
+                SELECT ?tr (COUNT(?_trEnd) as ?n) (SAMPLE(?_name) as ?name)
+                WHERE {
+                    VALUES ?eq_graph { $EQ_GRAPH }
+                    GRAPH ?eq_graph {
+                        ?tr a cim:PowerTransformer;
+                            cim:IdentifiedObject.name ?_name.
+
+                        ?_trEnd a cim:PowerTransformerEnd;
+                                cim:PowerTransformerEnd.PowerTransformer ?tr.
+                    }
+
+                    $IN_SERVICE
+                    # GRAPH ?ssh_graph { ?tr cim:Equipment.inService "true". }
+                }
+                GROUP BY ?tr
+                HAVING (?n = $WINDING_COUNT)
+            }
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?trEnd a cim:PowerTransformerEnd;
+                        cim:PowerTransformerEnd.PowerTransformer ?tr;
+                        cim:TransformerEnd.Terminal ?_term;
+                        cim:TransformerEnd.endNumber ?endNumber;
+                        cim:PowerTransformerEnd.b ?_b;
+                        cim:PowerTransformerEnd.r ?_r;
+                        cim:PowerTransformerEnd.x ?_x;
+                        cim:PowerTransformerEnd.ratedU ?ratedU.
+
+                OPTIONAL { GRAPH ?eq_graph { ?trEnd cim:PowerTransformerEnd.connectionKind ?connectionType. } }
+                OPTIONAL { GRAPH ?eq_graph { ?trEnd cim:PowerTransformerEnd.g ?_g. } }
+                OPTIONAL { GRAPH ?eq_graph { ?trEnd cim:PowerTransformerEnd.ratedS ?ratedS. } }
+
+                VALUES ?ssh_graph { $SSH_GRAPH }
+                OPTIONAL {
+                    GRAPH ?eq_graph {
+                        ?_ratiotapchanger a ?_ratiotap_type;
+                                            cim:RatioTapChanger.TransformerEnd ?trEnd;
+                                            cim:RatioTapChanger.stepVoltageIncrement ?stepSize;
+                                            cim:TapChanger.normalStep ?normalStep;
+                                            cim:TapChanger.neutralStep ?neutralStep;
+                                            cim:TapChanger.highStep ?highStep;
+                                            cim:TapChanger.lowStep ?lowStep;
+                                            cim:TapChanger.neutralU ?neutralU.
+                    }
+
+                    GRAPH ?ssh_graph {
+                        ?_ratiotapchanger cim:TapChanger.step ?sshStep;
+                    }
+
+
+                    OPTIONAL {
+                        VALUES ?sv_graph { $SV_GRAPH }
+                        GRAPH ?sv_graph {
+                            ?svTap cim:SvTapStep.TapChanger ?_ratiotapchanger;
+                                cim:SvTapStep.position ?svStep.
+                        }
+                    }
+                    BIND(COALESCE(?svStep, ?sshStep, ?normalStep) as ?step)
+
+                    OPTIONAL {
+                        GRAPH ?eq_graph {
+                            ?_ratiotapchanger cim:RatioTapChanger.RatioTapChangerTable ?_table.
+
+                            ?_tpoint cim:RatioTapChangerTablePoint.RatioTapChangerTable ?_table;
+                                    cim:TapChangerTablePoint.b ?_tb;
+                                    cim:TapChangerTablePoint.g ?_tg;
+                                    cim:TapChangerTablePoint.r ?_tr;
+                                    cim:TapChangerTablePoint.x ?_tx;
+                                    cim:TapChangerTablePoint.ratio ?_tratio;
+                                    cim:TapChangerTablePoint.step ?_tstep.
+                        }
+                        filter(xsd:float(?_tstep) = xsd:float(?step))
+                    }
+                }
+            }
+
+            ## use values (delta in percent) from table point to compute the real rxgb values
+            BIND((xsd:double(?_r) * (1 + xsd:double(?_tr) / 100)) as ?_rCorr)
+            BIND((xsd:double(?_x) * (1 + xsd:double(?_tx) / 100)) as ?_xCorr)
+            BIND((xsd:double(?_b) * (1 + xsd:double(?_tb) / 100)) as ?_bCorr)
+            BIND((xsd:double(?_g) * (1 + xsd:double(?_tg) / 100)) as ?_gCorr)
+
+            BIND(COALESCE(?_rCorr, ?_r) as ?r)
+            BIND(COALESCE(?_xCorr, ?_x) as ?x)
+            BIND(COALESCE(?_bCorr, ?_b) as ?b)
+            BIND(COALESCE(?_gCorr, ?_g) as ?g)
+
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?_phasetapchanger a ?_phasetap_type;
+                                        cim:PhaseTapChanger.TransformerEnd ?trEnd.
+                }
+            }
+
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?_term cim:Terminal.TopologicalNode ?node.
+                ?node cim:TopologicalNode.BaseVoltage ?_bv1.
+            }
+            GRAPH ?ssh_graph {
+                ?_term cim:ACDCTerminal.connected ?connected.
+            }
+
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv {
+                ?_bv1 cim:BaseVoltage.nominalVoltage ?nomU.
+            }
+
+            OPTIONAL {
+                $TOPO_ISLAND
+                # GRAPH ?sv_graph {
+                #     ?topoIsland # cim:IdentifiedObject.name "Network";
+                #                 cim:TopologicalIsland.TopologicalNodes ?node.
+                # }
+            }
+
+            BIND(COALESCE(?_phasetapchanger, ?_ratiotapchanger) as ?tapchanger)
+            BIND(COALESCE(?_phasetap_type, ?_ratiotap_type) as ?taptype)
 
         }
         ORDER BY ?tr ?endNumber
@@ -177,21 +307,21 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                                 cim:TapChanger.neutralU ?neutralU.
 
             OPTIONAL {
-                ?tapchanger cim:TapChanger.step ?tcStep;
+                ?tapchanger cim:TapChanger.step ?sshStep;
             }
 
             OPTIONAL {
                 ?svTap cim:SvTapStep.TapChanger ?tapchanger;
                     cim:SvTapStep.position ?svStep.
             }
-            BIND(COALESCE(?svStep, ?tcStep, ?normalStep, ?neutralStep, "0") as ?step)
+            BIND(COALESCE(?svStep, ?sshStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             # Phase Tap Changer Tablular
             OPTIONAL {
                 ?tapchanger cim:PhaseTapChangerTabular.PhaseTapChangerTable ?_table.
 
                 ?_tpoint cim:PhaseTapChangerTablePoint.PhaseTapChangerTable ?_table;
-                         cim:TapChangerTablePoint.step ?_tcStep;
+                         cim:TapChangerTablePoint.step ?tcStep;
                          cim:PhaseTapChangerTablePoint.angle ?tcAngle.
 
                 OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?tcRatio. }
@@ -200,7 +330,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                 OPTIONAL { ?_tpoint cim:TapChangerTablePoint.g ?_tg. }
                 OPTIONAL { ?_tpoint cim:TapChangerTablePoint.b ?_tb. }
 
-                filter(xsd:float(?_tcStep) = xsd:float(?step))
+                filter(xsd:float(?tcStep) = xsd:float(?step))
             }
 
             # Phase Tap Changer Linear
@@ -245,6 +375,154 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?tr ?endNumber
     """
 
+    _pst_query_graph = """
+        SELECT
+            ?tr ?name ?_term ?trEnd ?node ?connectionType
+            ?r ?x ?g ?b ?tcRatio ?tcStep ?tcAngle
+            ?ratedS ?ratedU ?nomU ?connected ?endNumber
+            ?tapchanger
+            ?lowStep ?highStep ?neutralStep ?normalStep ?step ?svStep ?neutralU
+            ?stepPhaseShift ?xMax ?stepVoltageIncrement ?windingConnectionAngle ?taptype
+            ?topoIsland
+        WHERE {
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            VALUES ?ssh_graph { $SSH_GRAPH }
+            VALUES ?tp_graph { $TP_GRAPH }
+
+            {
+                SELECT ?tr (COUNT(?_trEnd) as ?n) (SAMPLE(?_name) as ?name) (SAMPLE(?_ptc) as ?ptc)
+                WHERE {
+                    GRAPH ?eq_graph {
+                        ?tr a cim:PowerTransformer;
+                            cim:IdentifiedObject.name ?_name.
+
+                            ?_trEnd a cim:PowerTransformerEnd;
+                                cim:PowerTransformerEnd.PowerTransformer ?tr.
+
+                        optional {?_ptc cim:PhaseTapChanger.TransformerEnd ?_trEnd.}
+                    }
+
+                    $IN_SERVICE
+                    # GRAPH ?ssh_graph { ?tr cim:Equipment.inService "true". }
+                }
+                GROUP BY ?tr
+                HAVING (bound(?ptc) && ?n = $WINDING_COUNT)
+            }
+
+
+            GRAPH ?eq_graph {
+                ?trEnd a cim:PowerTransformerEnd;
+                        cim:PowerTransformerEnd.PowerTransformer ?tr;
+                        cim:TransformerEnd.Terminal ?_term;
+                        cim:TransformerEnd.endNumber ?endNumber;
+                        cim:PowerTransformerEnd.b ?_b;
+                        cim:PowerTransformerEnd.r ?_r;
+                        cim:PowerTransformerEnd.x ?_x;
+                        cim:PowerTransformerEnd.ratedU ?ratedU.
+
+                OPTIONAL {?trEnd cim:PowerTransformerEnd.connectionKind ?connectionType.}
+                OPTIONAL {?trEnd cim:PowerTransformerEnd.g ?_g. }
+                OPTIONAL {?trEnd cim:PowerTransformerEnd.ratedS ?ratedS.}
+
+                OPTIONAL {
+                    ?tapchanger a ?_ratiotap_type;
+                                        cim:PhaseTapChanger.TransformerEnd ?trEnd;
+                                        cim:TapChanger.normalStep ?normalStep;
+                                        cim:TapChanger.neutralStep ?neutralStep;
+                                        cim:TapChanger.highStep ?highStep;
+                                        cim:TapChanger.lowStep ?lowStep;
+                                        cim:TapChanger.neutralU ?neutralU.
+
+                    GRAPH ?ssh_graph {
+                        ?tapchanger cim:TapChanger.step ?sshStep.
+                    }
+
+                    OPTIONAL {
+                        VALUES ?sv_graph { $SV_GRAPH }
+                        GRAPH ?sv_graph {
+                            ?svTap cim:SvTapStep.TapChanger ?tapchanger;
+                                cim:SvTapStep.position ?svStep.
+                        }
+                    }
+
+                    BIND(COALESCE(?svStep, ?sshStep, ?normalStep) as ?step)
+
+                    # Phase Tap Changer Tablular
+                    OPTIONAL {
+                        GRAPH ?eq_graph {
+                            ?tapchanger cim:PhaseTapChangerTabular.PhaseTapChangerTable ?_table.
+
+                            ?_tpoint cim:PhaseTapChangerTablePoint.PhaseTapChangerTable ?_table;
+                                    cim:TapChangerTablePoint.step ?tcStep;
+                                    cim:PhaseTapChangerTablePoint.angle ?tcAngle.
+
+                            OPTIONAL { ?_tpoint cim:TapChangerTablePoint.ratio ?tcRatio. }
+                            OPTIONAL { ?_tpoint cim:TapChangerTablePoint.r ?_tr. }
+                            OPTIONAL { ?_tpoint cim:TapChangerTablePoint.x ?_tx. }
+                            OPTIONAL { ?_tpoint cim:TapChangerTablePoint.g ?_tg. }
+                            OPTIONAL { ?_tpoint cim:TapChangerTablePoint.b ?_tb. }
+                        }
+                        filter(xsd:float(?tcStep) = xsd:float(?step))
+                    }
+
+                    # Phase Tap Changer Linear
+                    OPTIONAL {
+                        GRAPH ?eq_graph {
+                            ?tapchanger cim:PhaseTapChangerLinear.stepPhaseShiftIncrement ?stepPhaseShift;
+                                        cim:PhaseTapChangerLinear.xMax ?xMax.
+                        }
+                    }
+
+                    # Phase Tap Changer Non Linear
+                    OPTIONAL {
+                        GRAPH ?eq_graph {
+                            ?tapchanger cim:PhaseTapChangerNonLinear.voltageStepIncrement ?stepVoltageIncrement;
+                                        cim:PhaseTapChangerNonLinear.xMax ?xMax.
+                            OPTIONAL { ?tapchanger cim:PhaseTapChangerAsymmetrical.windingConnectionAngle ?windingConnectionAngle. }
+                        }
+                    }
+
+                }
+            }
+            ## use values (delta in percent) from table point to compute the real rxgb values
+            BIND((xsd:double(?_r) * (1 + xsd:double(?_tr) / 100)) as ?_rCorr)
+            BIND((xsd:double(?_x) * (1 + xsd:double(?_tx) / 100)) as ?_xCorr)
+            BIND((xsd:double(?_b) * (1 + xsd:double(?_tb) / 100)) as ?_bCorr)
+            BIND((xsd:double(?_g) * (1 + xsd:double(?_tg) / 100)) as ?_gCorr)
+
+            BIND(COALESCE(?_rCorr, ?_r) as ?r)
+            BIND(COALESCE(?_xCorr, ?_x) as ?x)
+            BIND(COALESCE(?_bCorr, ?_b) as ?b)
+            BIND(COALESCE(?_gCorr, ?_g, 0) as ?g)
+
+            BIND(COALESCE(?_phasetap_type, ?_ratiotap_type) as ?_taptype)
+            BIND(STRAFTER(STR(?_taptype), "#") AS ?taptype)
+
+            GRAPH ?tp_graph {
+                ?_term cim:Terminal.TopologicalNode ?node.
+                ?node cim:TopologicalNode.BaseVoltage ?_bv.
+            }
+            GRAPH ?ssh_graph {
+                ?_term cim:ACDCTerminal.connected ?connected.
+            }
+
+            GRAPH ?eq_graph_bv {
+                ?_bv cim:BaseVoltage.nominalVoltage ?nomU.
+            }
+
+            OPTIONAL {
+                $TOPO_ISLAND
+                # GRAPH ?sv_graph {
+                #     ?topoIsland # cim:IdentifiedObject.name "Network";
+                #                 cim:TopologicalIsland.TopologicalNodes ?node.
+                # }
+            }
+        }
+        ORDER BY ?tr ?endNumber
+    """
+
     @abstractmethod
     def winding_count(self) -> int:
         raise NotImplementedError
@@ -256,13 +534,27 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
             pd.DataFrame: Query Result
         """
 
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?node"),
-            "$WINDING_COUNT": str(self.winding_count()),
-        }
-        q = self._replace(self._pst_query, args)
-        res = self._source.query(q)
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?node"),
+                "$IN_SERVICE": self._in_service_graph("?tr"),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+                "$WINDING_COUNT": str(self.winding_count()),
+            }
+            q = self._replace(self._pst_query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?node"),
+                "$WINDING_COUNT": str(self.winding_count()),
+            }
+            q = self._replace(self._pst_query, args)
+            res = self._source.query(q)
 
         return self._process_query_result(res)
 
@@ -275,13 +567,27 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
             pd.DataFrame: Query Result
         """
 
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?node"),
-            "$WINDING_COUNT": str(self.winding_count()),
-        }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?node"),
+                "$IN_SERVICE": self._in_service_graph("?tr"),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+                "$WINDING_COUNT": str(self.winding_count()),
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?node"),
+                "$WINDING_COUNT": str(self.winding_count()),
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         return self._process_query_result(res)
 

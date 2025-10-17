@@ -15,6 +15,8 @@
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from ..component import AbstractPgmComponentBuilder
 
 
@@ -23,6 +25,40 @@ class SourceFromIslandBuilder(AbstractPgmComponentBuilder):
     Class to create source objects based on existing SV-Profile.
     The same Nodes are used as Sources as in the SV-Profile.
     Based on `cim:TopologicalIsland.AngleRefTopologicalNode`.
+    """
+
+    _query = """
+        SELECT ?topologicalNode ?islandName
+        WHERE {
+            ?topoIsland a cim:TopologicalIsland;
+                        cim:TopologicalIsland.AngleRefTopologicalNode ?topologicalNode.
+
+            $TOPO_ISLAND
+            # ?topoIsland cim:IdentifiedObject.name "Network";
+            #             cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+
+            ?topoIsland cim:IdentifiedObject.name ?islandName;
+        }
+        ORDER BY ?topologicalNode
+    """
+
+    _query_graph = """
+        SELECT ?topologicalNode ?islandName
+        WHERE {
+            VALUES ?sv_graph { $SV_GRAPH }
+            GRAPH ?sv_graph {
+                ?topoIsland a cim:TopologicalIsland;
+                            cim:IdentifiedObject.name ?islandName;
+                            cim:TopologicalIsland.AngleRefTopologicalNode ?topologicalNode.
+            }
+
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
+        }
+        ORDER BY ?topologicalNode
     """
 
     def is_active(self):
@@ -56,25 +92,20 @@ class SourceFromIslandBuilder(AbstractPgmComponentBuilder):
         return arr, extra_info
 
     def get_source(self):
-        query = """
-            SELECT ?topologicalNode ?islandName
-            WHERE {
-                ?topoIsland a cim:TopologicalIsland;
-                            cim:TopologicalIsland.AngleRefTopologicalNode ?topologicalNode.
-
-                $TOPO_ISLAND
-                # ?topoIsland cim:IdentifiedObject.name "Network E BWW 170";
-                #             cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
-
-                ?topoIsland cim:IdentifiedObject.name ?islandName;
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?topologicalNode"),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
             }
-            ORDER BY ?topologicalNode
-        """
-        args = {
-            "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
-        }
-        q = self._replace(query, args)
-        return self._source.query(q)
+            q = self._replace(self._query_graph, args)
+            return self._source.query(q)
+        else:
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+            }
+            q = self._replace(self._query, args)
+            return self._source.query(q)
 
     def component_name(self) -> ComponentType:
         return ComponentType.source
