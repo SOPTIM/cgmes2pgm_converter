@@ -25,7 +25,7 @@ from ...component import AbstractPgmComponentBuilder
 class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
 
     _query = """
-        SELECT ?tr ?name ?_term ?trEnd ?node ?b ?connectionType ?g ?r ?x ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland
+        SELECT ?tr ?name ?_term ?trEnd ?node ?b ?connectionType ?g ?r ?x ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_ratiotap_type
         WHERE {
 
         {
@@ -61,7 +61,6 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
             ?_ratiotapchanger a ?_ratiotap_type;
                                 cim:RatioTapChanger.TransformerEnd ?trEnd;
                                 cim:RatioTapChanger.stepVoltageIncrement ?stepSize;
-                                cim:TapChanger.step ?sshStep;
                                 cim:TapChanger.normalStep ?normalStep;
                                 cim:TapChanger.neutralStep ?neutralStep;
                                 cim:TapChanger.highStep ?highStep;
@@ -69,11 +68,15 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                                 cim:TapChanger.neutralU ?neutralU.
 
             OPTIONAL {
+                ?_ratiotapchanger cim:TapChanger.step ?sshStep;
+            }
+
+            OPTIONAL {
                 ?svTap cim:SvTapStep.TapChanger ?_ratiotapchanger;
                     cim:SvTapStep.position ?svStep.
             }
 
-            BIND(COALESCE(?svStep, ?sshStep, ?normalStep) as ?step)
+            BIND(COALESCE(?svStep, ?sshStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             OPTIONAL {
                 ?_ratiotapchanger cim:RatioTapChanger.RatioTapChangerTable ?_table.
@@ -125,7 +128,7 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
     """
 
     _query_graph = """
-        SELECT ?tr ?name ?_term ?trEnd ?node ?connectionType ?r ?x ?g ?b ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_table
+        SELECT ?tr ?name ?_term ?trEnd ?node ?connectionType ?r ?x ?g ?b ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_ratiotap_type
         WHERE {
             {
                 SELECT ?tr (COUNT(?_trEnd) as ?n) (SAMPLE(?_name) as ?name)
@@ -297,7 +300,6 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
         OPTIONAL {
             ?tapchanger a ?_ratiotap_type;
                                 cim:PhaseTapChanger.TransformerEnd ?trEnd;
-                                cim:TapChanger.step ?sshStep;
                                 cim:TapChanger.normalStep ?normalStep;
                                 cim:TapChanger.neutralStep ?neutralStep;
                                 cim:TapChanger.highStep ?highStep;
@@ -305,11 +307,14 @@ class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
                                 cim:TapChanger.neutralU ?neutralU.
 
             OPTIONAL {
+                ?tapchanger cim:TapChanger.step ?sshStep;
+            }
+
+            OPTIONAL {
                 ?svTap cim:SvTapStep.TapChanger ?tapchanger;
                     cim:SvTapStep.position ?svStep.
             }
-
-            BIND(COALESCE(?svStep, ?sshStep, ?normalStep) as ?step)
+            BIND(COALESCE(?svStep, ?sshStep, ?normalStep, ?neutralStep, "0") as ?step)
 
             # Phase Tap Changer Tablular
             OPTIONAL {

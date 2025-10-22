@@ -62,6 +62,11 @@ class EquivalentBranchBuilder(LineBuilder):
 
         nomv1 = res["nomv1"]
         nomv2 = res["nomv2"]
+        eq_nomv = res["eq_nomv"]
+
+        ## TODO: maybe do this not with nominal voltages of the two nodes
+        ## but with nominal voltages of the line and the from_node ?!?!?!?
+        # z_conv, y_conv = self._calc_conversion_factors(nomv1, eq_nomv)
 
         z_conv, y_conv = self._calc_conversion_factors(nomv1, nomv2)
 

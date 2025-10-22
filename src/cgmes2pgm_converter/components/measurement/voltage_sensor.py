@@ -152,7 +152,7 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     def _read_meas_from_graph(self):
         named_graphs = self._source.named_graphs
         args = {
-            "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
+            "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
             "$OP_GRAPH": named_graphs.format_for_query(Profile.OP),
             "$MEAS_GRAPH": named_graphs.format_for_query(Profile.MEAS),
             "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),

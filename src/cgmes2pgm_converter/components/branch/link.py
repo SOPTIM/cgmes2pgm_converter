@@ -39,6 +39,7 @@ class LinkBuilder(AbstractPgmComponentBuilder):
                 cim:IdentifiedObject.name ?name;
                 $IN_SERVICE
                 # cim:Equipment.inService "true";
+                cim:Switch.retained "true";
                 cim:Switch.open ?open.
 
             BIND(STRAFTER(STR(?_type), "#") AS ?type)
@@ -83,7 +84,7 @@ class LinkBuilder(AbstractPgmComponentBuilder):
             VALUES ?eq_graph { $EQ_GRAPH }
             GRAPH ?eq_graph {
                 ?eq a ?_type;
-                    # cim:Switch.retained ?retained;
+                    cim:Switch.retained "true";
                     cim:IdentifiedObject.name ?name.
 
                 ?term1 a cim:Terminal;
