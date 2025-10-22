@@ -77,10 +77,16 @@ class NamedGraphs:
 
         if graph_name in self.graphs[profile_info.profile] and not updating:
             logging.warning(
-                "Graph %s for profile %s already exists.", graph_name, profile_info
+                "Graph %s for profile %s already exists.",
+                graph_name,
+                f"{profile_info.profile}{'[BD]' if profile_info.boundary else ''}",
             )
         else:
-            logging.debug("Adding graph %s for profile %s.", graph_name, profile_info)
+            logging.debug(
+                "Adding graph %s for profile %s.",
+                graph_name,
+                f"{profile_info.profile}{'[BD]' if profile_info.boundary else ''}",
+            )
             self.graphs[profile_info.profile].add(graph_name)
             self._graph_names[graph_name].add(profile_info)
 
@@ -213,9 +219,13 @@ class CgmesDataset(SparqlDataSource):
         named_graphs = self.named_graphs
         for idx, item in dataset_profiles.iterrows():
 
-            graph_name = item["g"]
+            graph_name = item["graph"]
             profile_str = item["profile"]
             profile_info = Profile.parse(profile_str)
+            if profile_info.profile == Profile.SV and "cgmes2pgm" in graph_name.lower():
+                # skip SV graph created by cgmes2pgm libraries itself, in order to
+                # not mix original and computed values and make new calculations reproducible
+                continue
             if profile_info.profile != Profile.UNKNOWN:
                 named_graphs.add(profile_info, graph_name, updating=False)
 
