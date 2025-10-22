@@ -18,6 +18,8 @@ from typing import override
 
 import pandas as pd
 
+from cgmes2pgm_converter.common.cgmes_literals import ProfileInfo
+
 from .cgmes_literals import CIM_ID_OBJ, Profile
 from .sparql_datasource import SparqlDataSource
 
@@ -61,24 +63,26 @@ fullmodel_query = f"""
 class NamedGraphs:
     def __init__(self, base_url: str, default_graph: str = "default"):
         self.graphs: dict[Profile, set[str]] = {}
-        self._graph_names: dict[str, set[Profile]] = {}
+        self._graph_names: dict[str, set[ProfileInfo]] = {}
         self.base_url = base_url
         self.default_graph = default_graph
 
-    def add(self, profile: Profile, graph_name: str, updating: bool = False) -> str:
-        if profile not in self.graphs:
-            self.graphs[profile] = set()
+    def add(
+        self, profile_info: ProfileInfo, graph_name: str, updating: bool = False
+    ) -> str:
+        if profile_info.profile not in self.graphs:
+            self.graphs[profile_info.profile] = set()
         if graph_name not in self._graph_names:
             self._graph_names[graph_name] = set()
 
-        if graph_name in self.graphs[profile] and not updating:
+        if graph_name in self.graphs[profile_info.profile] and not updating:
             logging.warning(
-                "Graph %s for profile %s already exists.", graph_name, profile
+                "Graph %s for profile %s already exists.", graph_name, profile_info
             )
         else:
-            logging.debug("Adding graph %s for profile %s.", graph_name, profile)
-            self.graphs[profile].add(graph_name)
-            self._graph_names[graph_name].add(profile)
+            logging.debug("Adding graph %s for profile %s.", graph_name, profile_info)
+            self.graphs[profile_info.profile].add(graph_name)
+            self._graph_names[graph_name].add(profile_info)
 
         return graph_name
 
@@ -87,20 +91,20 @@ class NamedGraphs:
         for name in names:
             profiles = self._graph_names.get(name)
             if profiles:
-                profiles.discard(profile)
+                [profiles.discard(pr) for pr in profiles if pr.profile == profile]
                 if not profiles:
                     # remove whole entry if no profiles left
                     self._graph_names.pop(name)
 
     def remove_graph(self, graph_name: str) -> None:
-        profiles = self._graph_names.pop(graph_name, set())
-        for profile in profiles:
-            graphs = self.graphs.get(profile)
+        profile_infos = self._graph_names.pop(graph_name, set())
+        for pi in profile_infos:
+            graphs = self.graphs.get(pi.profile)
             if graphs:
                 graphs.discard(graph_name)
                 if not graphs:
                     # remove whole entry if no graphs left
-                    self.graphs.pop(profile)
+                    self.graphs.pop(pi.profile)
 
     def determine_graph_name(self, profile: list[Profile], mas: list[str] = []) -> str:
 
@@ -211,9 +215,9 @@ class CgmesDataset(SparqlDataSource):
 
             graph_name = item["g"]
             profile_str = item["profile"]
-            profile = Profile.parse(profile_str)
-            if profile != Profile.UNKNOWN:
-                named_graphs.add(profile, graph_name, updating=False)
+            profile_info = Profile.parse(profile_str)
+            if profile_info.profile != Profile.UNKNOWN:
+                named_graphs.add(profile_info, graph_name, updating=False)
 
         if (named_graphs.graphs.get(Profile.OP)) and (
             not named_graphs.graphs.get(Profile.MEAS)

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum, auto
+from dataclasses import dataclass
+from enum import auto
 
 from strenum import StrEnum
 
@@ -30,6 +31,12 @@ def phase_tap_changer_types(cim_namespace: str):
         f"{cim_namespace}PhaseTapChangerAsymmetrical",
         f"{cim_namespace}PhaseTapChangerSymmetrical",
     ]
+
+
+@dataclass(frozen=True)
+class ProfileInfo:
+    profile: "Profile"
+    boundary: bool
 
 
 class Profile(StrEnum):
@@ -57,31 +64,31 @@ class Profile(StrEnum):
     """Unknown profile"""
 
     @staticmethod
-    def parse(profile_str: str) -> "Profile":
+    def parse(profile_str: str) -> ProfileInfo:
         if (
             "EquipmentBoundary/" in profile_str
             or "EquipmentBoundary-EU" in profile_str
             or "BoundaryEquipment" in profile_str
         ):
             # no EQ_BD, boundary equipment is just equipment for the EU/ENTSO-E modeling authority set
-            return Profile.EQ
+            return ProfileInfo(Profile.EQ, True)
         elif "TopologyBoundary" in profile_str or "BoundaryTopology" in profile_str:
             # no TP_BD, boundary topology is just topology for the EU/ENTSO-E modeling authority set
-            return Profile.TP
+            return ProfileInfo(Profile.TP, True)
         elif "CoreEquipment" in profile_str or "EquipmentCore" in profile_str:
-            return Profile.EQ
+            return ProfileInfo(Profile.EQ, False)
         elif "Topology" in profile_str:
-            return Profile.TP
+            return ProfileInfo(Profile.TP, False)
         elif "Operation/4.0" in profile_str:
-            return Profile.OP
+            return ProfileInfo(Profile.OP, False)
         elif "OperationMeas/4.0" in profile_str:
-            return Profile.MEAS
+            return ProfileInfo(Profile.MEAS, False)
         elif "SteadyStateHypothesis" in profile_str:
-            return Profile.SSH
+            return ProfileInfo(Profile.SSH, False)
         elif "StateVariables" in profile_str:
-            return Profile.SV
+            return ProfileInfo(Profile.SV, False)
         else:
-            return Profile.UNKNOWN
+            return ProfileInfo(Profile.UNKNOWN, False)
 
 
 class MeasurementValueSource(StrEnum):
