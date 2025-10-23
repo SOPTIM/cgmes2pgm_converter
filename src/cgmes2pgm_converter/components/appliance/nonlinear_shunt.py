@@ -15,6 +15,8 @@
 import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
+from cgmes2pgm_converter.common.cgmes_literals import Profile
+
 from ..component import AbstractPgmComponentBuilder
 
 
@@ -57,13 +59,77 @@ class NonLinearShuntBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?ShuntCompensator
     """
 
-    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?_topologicalNode"),
+    _query_graph = """
+        SELECT  (SAMPLE(?_name) as ?name)
+                (SAMPLE(?_topologicalNode) as ?topologicalNode)
+                (SAMPLE(?_connected) as ?connected)
+                (SAMPLE(?_Terminal) as ?terminal)
+                ?ShuntCompensator
+                (SUM(xsd:double(?_b)) as ?b)
+                (SUM(xsd:double(?_g)) as ?g)
+                (SAMPLE(xsd:float(?_sections)) as ?sections)
+        WHERE {
+            VALUES ?eq_graph { $EQ_GRAPH }
+            VALUES ?tp_graph { $TP_GRAPH }
+            VALUES ?ssh_graph { $SSH_GRAPH }
+
+            GRAPH ?eq_graph {
+                ?_Terminal a cim:Terminal;
+                            cim:Terminal.ConductingEquipment ?ShuntCompensator.
+
+                ?ShuntCompensator a cim:NonlinearShuntCompensator;
+                                    cim:IdentifiedObject.name ?_name.
+
+                ?Point a cim:NonlinearShuntCompensatorPoint;
+                        cim:NonlinearShuntCompensatorPoint.NonlinearShuntCompensator ?ShuntCompensator;
+                        cim:NonlinearShuntCompensatorPoint.sectionNumber ?_sectionNum;
+                        cim:NonlinearShuntCompensatorPoint.g ?_g;
+                        cim:NonlinearShuntCompensatorPoint.b ?_b.
+            }
+
+            $IN_SERVICE
+            # GRAPH ?ssh_graph { ?ShuntCompensator cim:Equipment.inService "true"; }
+
+            GRAPH ?ssh_graph {
+                ?_Terminal cim:ACDCTerminal.connected ?_connected.
+                ?ShuntCompensator cim:ShuntCompensator.sections ?_sections.
+            }
+            GRAPH ?tp_graph {
+                ?_Terminal cim:Terminal.TopologicalNode ?_topologicalNode.
+            }
+
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
+
+            filter(xsd:float(?_sectionNum) <= xsd:float(?_sections))
         }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+
+        GROUP BY ?ShuntCompensator
+        ORDER BY ?ShuntCompensator
+    """
+
+    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$IN_SERVICE": self._in_service_graph("?ShuntCompensator"),
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?_topologicalNode"),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?_topologicalNode"),
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         arr = initialize_array(self._data_type, self.component_name(), res.shape[0])
         arr["id"] = self._id_mapping.add_cgmes_iris(

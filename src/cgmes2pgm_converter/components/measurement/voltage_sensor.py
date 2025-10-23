@@ -21,6 +21,7 @@ from power_grid_model import ComponentType, initialize_array
 from cgmes2pgm_converter.common import (
     AbstractCgmesIdMapping,
     CgmesDataset,
+    ConverterOptions,
     Profile,
     VoltageMeasType,
 )
@@ -33,7 +34,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
     _query_meas_in_graph = """
         SELECT ?tn ?term ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
-            GRAPH <$OP_GRAPH> {
+            VALUES ?op_graph { $OP_GRAPH }
+            GRAPH ?op_graph {
+                VALUES ?type_u { "Voltage" "LineToLineVoltage" }
                 ?meas_u cim:Measurement.measurementType ?type_u;
                         cim:IdentifiedObject.name ?name;
                         cim:Measurement.Terminal ?term.
@@ -41,21 +44,29 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
                 ?measVal_v cim:AnalogValue.Analog ?meas_u;
                 OPTIONAL { ?measVal_v cim:MeasurementValue.sensorAccuracy ?acc_u. }
                 OPTIONAL { ?measVal_v cim:MeasurementValue.sensorSigma ?sigma_u. }
-
             }
-            VALUES ?type_u { "Voltage" "LineToLineVoltage" }
 
-            ?term cim:Terminal.TopologicalNode ?tn.
-
-            GRAPH <$MEAS_GRAPH> {
+            VALUES ?meas_graph { $MEAS_GRAPH }
+            GRAPH ?meas_graph {
                 ?measVal_v cim:AnalogValue.value ?u.
             }
 
-            ?tn cim:TopologicalNode.BaseVoltage/cim:BaseVoltage.nominalVoltage ?nom_u.
+            VALUES ?tp_graph { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?term cim:Terminal.TopologicalNode ?tn.
+                ?tn cim:TopologicalNode.BaseVoltage ?_bv.
+            }
+
+            VALUES ?eq_graph_bv { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv {
+                ?_bv cim:BaseVoltage.nominalVoltage ?nom_u.
+            }
 
             $TOPO_ISLAND
-            #?topoIsland cim:IdentifiedObject.name "Network";
-            #            cim:TopologicalIsland.TopologicalNodes ?tn
+            # GRAPH ?sv_graph {
+            #     ?topoIsland cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn;
+            # }
         }
         ORDER BY ?tn
     """
@@ -90,15 +101,21 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         self,
         cgmes_source: CgmesDataset,
         id_mapping: AbstractCgmesIdMapping,
+        converter_options: ConverterOptions,
         data_type: str = "input",
     ):
-        super().__init__(cgmes_source, id_mapping, data_type)
+        super().__init__(
+            cgmes_source,
+            id_mapping,
+            converter_options=converter_options,
+            data_type=data_type,
+        )
         self._use_nominal_voltages = (
             self._converter_options.measurement_substitution.use_nominal_voltages
         )
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        if Profile.OP in self._source.graphs:
+        if self._source.split_profiles:
             res = self._read_meas_from_graph()
         else:
             res = self._read_meas_from_default_graph()
@@ -133,21 +150,39 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         return arr, extra_info
 
     def _read_meas_from_graph(self):
+        named_graphs = self._source.named_graphs
         args = {
-            "$TOPO_ISLAND": self._at_topo_island_node("?tn"),
-            "$OP_GRAPH": self._source.graphs[Profile.OP],
-            "$MEAS_GRAPH": self._source.graphs[Profile.MEAS],
+            "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
+            "$OP_GRAPH": named_graphs.format_for_query(Profile.OP),
+            "$MEAS_GRAPH": named_graphs.format_for_query(Profile.MEAS),
+            "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+            "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+            "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
         }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
         res["meas_type"] = VoltageMeasType.FIELD
-        return res
+
+        sigma_by_nomv = [
+            self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nomv
+            )
+            for nomv in res["nom_u"]
+        ]
+        missing_sigma_u = res["sigma_u"].isna()
+        res.loc[missing_sigma_u, "sigma_u"] = sigma_by_nomv
+
+        return self._process_measurements(res)
 
     def _read_meas_from_default_graph(self):
         args = {"$TOPO_ISLAND": self._at_topo_island_node("?tn")}
         q = self._replace(self._query_meas_in_default, args)
         res = self._source.query(q)
+        res["meas_type"] = VoltageMeasType.FIELD
 
+        return self._process_measurements(res)
+
+    def _process_measurements(self, res: pd.DataFrame) -> pd.DataFrame:
         meas_by_tn = self._join_measurements_by_node(res)
 
         tn = []
@@ -209,7 +244,6 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         float | None,
         str | None,
         str | None,
-        float | None,
         VoltageMeasType,
     ]:
         has_sigma = (
@@ -244,7 +278,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
             meas_val = self._get_median_value(meas_u, "u")
 
             value = meas_val["u"]
-            _, sigma = self._use_nominal_voltages.map_kv(nom_u)
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nom_u
+            )
 
             name = meas_val["name"]
             meas = meas_val["meas_u"]
@@ -252,6 +288,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
         if value == 0.0:
             # 0 kV is invalid for PGM, derive measurement from nominal voltage
             value, sigma = self._use_nominal_voltages.map_kv(nom_u)
+            sigma = self._converter_options.measurement_substitution.default_sigma_pq.get_sigma_u(
+                nom_u
+            )
             meas_type = VoltageMeasType.SUBSTITUTED_NOM_V
 
         return value, sigma, name, meas, meas_type

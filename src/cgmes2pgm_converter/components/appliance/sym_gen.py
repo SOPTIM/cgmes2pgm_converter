@@ -16,6 +16,7 @@ import numpy as np
 from power_grid_model import ComponentType, LoadGenType, initialize_array
 
 from cgmes2pgm_converter.common import convert_unit_multiplier
+from cgmes2pgm_converter.common.cgmes_literals import Profile
 
 from ..component import AbstractPgmComponentBuilder
 
@@ -51,7 +52,7 @@ class SymGenBuilder(AbstractPgmComponentBuilder):
             OPTIONAL {
                 ?RegC a cim:RegulatingControl;
                         cim:RegulatingControl.Terminal ?terminal;
-                        cim:RegulatingControl.mode <cim:RegulatingControlModeKind.voltage>;
+                        cim:RegulatingControl.mode cim:RegulatingControlModeKind.voltage;
                         cim:RegulatingControl.targetValue ?targetVoltage;
                         cim:RegulatingControl.targetValueUnitMultiplier ?valMultiplier.
             }
@@ -75,13 +76,122 @@ class SymGenBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?EnergyProducer
     """
 
-    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | dict]:
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+    _query_graph = """
+        SELECT ?name ?topologicalNode ?connected ?EnergyProducer ?p ?q ?targetVoltage ?valMultiplier ?type ?terminal
+        WHERE {
+            VALUES ?_type { cim:GeneratingUnit
+                           cim:SynchronousMachine
+                           cim:ExternalNetworkInjection
+                           cim:EquivalentInjection
+                           cim:StaticVarCompensator
+                           cim:EnergySource
+                           }
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?EnergyProducer a ?_type;
+                            cim:IdentifiedObject.name ?name.
+
+                ?terminal a cim:Terminal;
+                            cim:Terminal.ConductingEquipment ?EnergyProducer.
+            }
+            BIND(STRAFTER(STR(?_type), "#") AS ?type)
+
+            $IN_SERVICE
+            # GRAPH ?ssh_graph { ?EnergyProducer cim:Equipment.inService "true". }
+
+            VALUES ?ssh_graph { $SSH_GRAPH }
+            GRAPH ?ssh_graph {
+                ?terminal cim:ACDCTerminal.connected ?connected.
+            }
+
+            GRAPH ?tp_graph {
+                ?terminal cim:Terminal.TopologicalNode ?topologicalNode.
+            }
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?topologicalNode.
+            # }
+
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?RegC a cim:RegulatingControl;
+                            cim:RegulatingControl.Terminal ?terminal;
+                            cim:RegulatingControl.mode cim:RegulatingControlModeKind.voltage.
+                }
+                GRAPH ?ssh_graph {
+                    ?RegC   cim:RegulatingControl.targetValue ?targetVoltage;
+                            cim:RegulatingControl.targetValueUnitMultiplier ?valMultiplier.
+                }
+            }
+
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:RotatingMachine.p ?_pRotMa.
+                    ?EnergyProducer cim:RotatingMachine.q ?_qRotMa.
+                }
+            }
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:ExternalNetworkInjection.p ?_pExtInj.
+                    ?EnergyProducer cim:ExternalNetworkInjection.q ?_qExInj.
+                }
+            }
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:EquivalentInjection.p ?_pEquivInj.
+                    ?EnergyProducer cim:EquivalentInjection.q ?_qEquivInj.
+                }
+            }
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:StaticVarCompensator.q ?_qSVC.
+                }
+            }
+
+            OPTIONAL {
+                GRAPH ?ssh_graph {
+                    ?EnergyProducer cim:EnergySource.activePower ?_pEnSrc.
+                    ?EnergyProducer cim:EnergySource.reactivePower ?_qEnSrc.
+                }
+            }
+
+            # bind p to 0 for a SVC
+            BIND(COALESCE(?_pRotMa, ?_pExtInj, ?_pEquivInj, ?_pEnSrc, 0) AS ?p)
+            BIND(COALESCE(?_qRotMa, ?_qExInj, ?_qEquivInj, ?_qEnSrc, ?_qSVC) AS ?q)
+
+            FILTER(BOUND(?p) && BOUND(?q))
+
         }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+        ORDER BY ?EnergyProducer
+
+    """
+
+    def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | dict]:
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$IN_SERVICE": self._in_service_graph("?EnergyProducer"),
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?topologicalNode"),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?topologicalNode"),
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         # Mw, MVar to W, Var
         res["p"] = -res["p"] * 1e6

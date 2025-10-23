@@ -16,6 +16,7 @@ import numpy as np
 from power_grid_model import ComponentType, initialize_array
 
 from cgmes2pgm_converter.common import AbstractCgmesIdMapping, BranchType, CgmesDataset
+from cgmes2pgm_converter.common.cgmes_literals import Profile
 
 from ..component import AbstractPgmComponentBuilder
 
@@ -33,6 +34,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
                 ?tn2
                 ?nomv1
                 ?nomv2
+                ?eq_nomv
                 ?status1
                 ?status2
                 ?type
@@ -47,6 +49,7 @@ class LineBuilder(AbstractPgmComponentBuilder):
             ?line a ?_type;
                     $IN_SERVICE
                     # cim:Equipment.inService "true";
+                    cim:ConductingEquipment.BaseVoltage/cim:BaseVoltage.nominalVoltage ?eq_nomv;
                     cim:IdentifiedObject.name ?name.
 
             BIND(STRAFTER(STR(?_type), "#") AS ?type)
@@ -96,6 +99,129 @@ class LineBuilder(AbstractPgmComponentBuilder):
         ORDER BY ?line
     """
 
+    _query_graph = """
+        SELECT  ?line
+                ?name
+                ?bch
+                ?gch
+                ?length
+                ?r
+                ?x
+                ?tn1
+                ?tn2
+                ?nomv1
+                ?nomv2
+                ?eq_nomv
+                ?status1
+                ?status2
+                ?type
+                ?term1
+                ?term2
+        WHERE {
+            VALUES ?_type {
+                cim:ACLineSegment
+                cim:EquivalentBranch
+                cim:SeriesCompensator
+            }
+
+            VALUES ?eq_graph { $EQ_GRAPH }
+            GRAPH ?eq_graph {
+                ?line a ?_type;
+                    cim:ConductingEquipment.BaseVoltage ?eq_bv;
+                    cim:IdentifiedObject.name ?name.
+
+                ?term1 a cim:Terminal;
+                    cim:Terminal.ConductingEquipment ?line;
+                    cim:ACDCTerminal.sequenceNumber "1".
+
+                ?term2 a cim:Terminal;
+                        cim:Terminal.ConductingEquipment ?line;
+                        cim:ACDCTerminal.sequenceNumber "2".
+            }
+            BIND(STRAFTER(STR(?_type), "#") AS ?type)
+
+            $IN_SERVICE
+            # GRAPH ?ssh_graph { ?line cim:Equipment.inService "true". }
+
+            VALUES ?ssh_graph { $SSH_GRAPH }
+            GRAPH ?ssh_graph {
+                ?term1 cim:ACDCTerminal.connected ?status1.
+                ?term2 cim:ACDCTerminal.connected ?status2.
+            }
+
+            VALUES ?tp_graph { $TP_GRAPH }
+            VALUES ?tp_graph_bv1 { $TP_GRAPH }
+            VALUES ?tp_graph_bv2 { $TP_GRAPH }
+            GRAPH ?tp_graph {
+                ?term1 cim:Terminal.TopologicalNode ?tn1.
+                ?term2 cim:Terminal.TopologicalNode ?tn2.
+            }
+            GRAPH ?tp_graph_bv1 {
+                ?tn1 cim:TopologicalNode.BaseVoltage ?_bv1.
+            }
+            GRAPH ?tp_graph_bv2 {
+                ?tn2 cim:TopologicalNode.BaseVoltage ?_bv2.
+            }
+
+            VALUES ?eq_graph_bv1 { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv1 {
+               ?_bv1 cim:BaseVoltage.nominalVoltage ?nomv1.
+            }
+            VALUES ?eq_graph_bv2 { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv2 {
+               ?_bv2 cim:BaseVoltage.nominalVoltage ?nomv2.
+            }
+            VALUES ?eq_graph_bv3 { $EQ_GRAPH }
+            GRAPH ?eq_graph_bv3 {
+                ?eq_bv cim:BaseVoltage.nominalVoltage ?eq_nomv
+            }
+
+            $TOPO_ISLAND
+            # GRAPH ?sv_graph {
+            #     ?topoIsland # cim:IdentifiedObject.name "Network";
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn1;
+            #                 cim:TopologicalIsland.TopologicalNodes ?tn2.
+            # }
+
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?line cim:ACLineSegment.r ?_aclR.
+                    ?line cim:ACLineSegment.x ?_aclX.
+                    ?line cim:ACLineSegment.bch ?_aclBch.
+                }
+            }
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?line cim:ACLineSegment.gch ?_aclGch.
+                }
+            }
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?line cim:EquivalentBranch.r ?_eqbR.
+                    ?line cim:EquivalentBranch.x ?_eqbX.
+                }
+            }
+            OPTIONAL {
+                GRAPH ?eq_graph {
+                    ?line cim:SeriesCompensator.r ?_srcR.
+                    ?line cim:SeriesCompensator.x ?_srcX.
+                }
+            }
+
+            BIND(COALESCE(?_aclR, ?_eqbR, ?_srcR, "0.0") as ?r)
+            BIND(COALESCE(?_aclX, ?_eqbX, ?_srcX, "0.0") as ?x)
+            BIND(COALESCE(?_aclBch, "0.0") as ?bch)
+            BIND(COALESCE(?_aclGch, "0.0") as ?gch)
+
+            FILTER(?tn1 != ?tn2)
+            FILTER(?status1 = "true" &&  ?status2 = "true")
+
+            $NOMV_FILTER
+            # FILTER(?nomv1 = ?nomv2)
+        }
+        ORDER BY ?line
+    """
+
     def __init__(
         self,
         cgmes_source: CgmesDataset,
@@ -110,13 +236,27 @@ class LineBuilder(AbstractPgmComponentBuilder):
         )
 
     def build_from_cgmes(self, _) -> tuple[np.ndarray, dict | None]:
-        args = {
-            "$IN_SERVICE": self._in_service(),
-            "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
-            "$NOMV_FILTER": "FILTER(?nomv1 = ?nomv2)",  # <- filter for same voltage levels
-        }
-        q = self._replace(self._query, args)
-        res = self._source.query(q)
+        if self._source.split_profiles:
+            named_graphs = self._source.named_graphs
+            args = {
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn1", "?tn2"),
+                "$IN_SERVICE": self._in_service_graph("?line"),
+                "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
+                "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
+                "$NOMV_FILTER": "FILTER(?nomv1 = ?nomv2)",  # <- filter for same voltage levels
+            }
+            q = self._replace(self._query_graph, args)
+            res = self._source.query(q)
+        else:
+            args = {
+                "$IN_SERVICE": self._in_service(),
+                "$TOPO_ISLAND": self._at_topo_island_node("?tn1", "?tn2"),
+                "$NOMV_FILTER": "FILTER(?nomv1 = ?nomv2)",  # <- filter for same voltage levels
+            }
+            q = self._replace(self._query, args)
+            res = self._source.query(q)
 
         arr = initialize_array(self._data_type, self.component_name(), res.shape[0])
         arr["id"] = self._id_mapping.add_cgmes_iris(res["line"], res["name"])

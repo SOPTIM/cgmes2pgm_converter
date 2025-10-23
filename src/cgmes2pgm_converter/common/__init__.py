@@ -22,6 +22,7 @@ from .cgmes_literals import (
     CIM_MEAS,
     MeasurementValueSource,
     Profile,
+    ProfileInfo,
     convert_unit_multiplier,
     phase_tap_changer_types,
 )
