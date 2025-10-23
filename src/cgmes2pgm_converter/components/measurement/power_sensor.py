@@ -57,20 +57,19 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
                     ?meas cim:Analog.positiveFlowIn ?_pfi.
                 }
                 BIND(COALESCE(?_pfi, "false") AS ?pfi)
+
+                ?_measVal_scada cim:AnalogValue.Analog ?meas.
+                OPTIONAL {
+                    ?_measVal_scada cim:MeasurementValue.sensorAccuracy ?acc.
+                }
+                OPTIONAL {
+                    ?_measVal_scada cim:MeasurementValue.sensorSigma ?sigma.
+                }
             }
 
             VALUES ?meas_graph { $MEAS_GRAPH }
             GRAPH ?meas_graph {
-                ?_measVal_scada cim:AnalogValue.Analog ?meas;
-                                cim:AnalogValue.value ?value.
-
-                OPTIONAL {
-                    ?_measVal_scada cim:MeasurementValue.sensorAccuracy ?acc.
-                }
-
-                OPTIONAL {
-                    ?_measVal_scada cim:MeasurementValue.sensorSigma ?sigma.
-                }
+                ?_measVal_scada cim:AnalogValue.value ?value.
             }
 
             VALUES ?tp_graph { $TP_GRAPH }
@@ -235,7 +234,7 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
         q_q = self._replace(self._query_meas_in_graph, args)
 
-        return self._read_meas_from_default_query(q_p, q_q)
+        return self._read_meas_from_query(q_p, q_q)
 
     def _read_meas_from_default_graph(self):
         args = {
@@ -249,9 +248,9 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
         args["$MEASUREMENT_TYPE"] = '"ThreePhaseReactivePower"'
         q_q = self._replace(self._query_meas_in_default, args)
 
-        return self._read_meas_from_default_query(q_p, q_q)
+        return self._read_meas_from_query(q_p, q_q)
 
-    def _read_meas_from_default_query(self, q_p, q_q):
+    def _read_meas_from_query(self, q_p, q_q):
         # # Read active power measurements
         res_p = self._source.query(q_p)
 
