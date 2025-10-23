@@ -27,6 +27,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
             self._converter_options.measurement_substitution.imeas_used_for_qcalc.enable
         )
 
+    ## TODO: Refactory query to use named graphs for EQ etc.. Need data with LineCurrent to test properly
     _query_meas_in_graph = """
         SELECT ?name ?eq ?meas_i ?meas_U ?nom_u ?nom_u_shunt ?tn ?connected
         WHERE {
@@ -146,7 +147,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
             if shunt_id not in measured_objects_dict:
                 shunt_without_q_meas.append(shunt_id)
 
-        if Profile.MEAS in self._source.graphs:
+        if self._source.split_profiles:
             res_orig = self._read_meas_from_named_graph()
         else:
             res_orig = self._read_meas_from_default_graph()

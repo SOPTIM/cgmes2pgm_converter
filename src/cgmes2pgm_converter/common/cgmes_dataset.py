@@ -121,13 +121,11 @@ class NamedGraphs:
         norm_mas = "_".join([self.normalize_mas(m) for m in mas_sorted])
 
         if len(profile) == 1:
-            return (
-                self.base_url + "/" + profile[0].name.lower() + "_" + norm_mas.lower()
-            )
+            return f"cim:{profile[0].name.upper()}{('_' + norm_mas.upper()) if norm_mas else ''}"
         else:
             profiles_sorted = sorted(profile, key=lambda p: p.name)
-            profile_part = "_".join(p.name.lower() for p in profiles_sorted)
-            return self.base_url + "/" + profile_part + "_" + norm_mas.lower()
+            profile_part = "_".join(p.name.upper() for p in profiles_sorted)
+            return f"cim:{profile_part}{('_' + norm_mas.upper()) if norm_mas else ''}"
 
     def get(self, profile: Profile) -> set[str]:
         return self.graphs.get(profile, set())
