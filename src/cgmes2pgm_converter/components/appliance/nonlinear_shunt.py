@@ -120,6 +120,7 @@ class NonLinearShuntBuilder(AbstractPgmComponentBuilder):
                 "$EQ_GRAPH": named_graphs.format_for_query(Profile.EQ),
                 "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
                 "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
+                "$SV_GRAPH": named_graphs.format_for_query(Profile.SV),
             }
             q = self._replace(self._query_graph, args)
             res = self._source.query(q)

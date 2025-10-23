@@ -98,11 +98,14 @@ class AbstractPgmComponentBuilder(ABC):
         return ""
 
     def _at_topo_island_node_graph(
-        self, node1, node2=None, graph_var: str = "?sv_graph"
+        self, node1, node2=None, graph_var: str = "?sv_graph", use_values: bool = True
     ):
         tmp = self._at_topo_island_node(node1, node2)
         if tmp:
-            return f"GRAPH {graph_var} {{ {tmp} }} "
+            if not use_values:
+                return f"GRAPH {graph_var} {{ {tmp} }} "
+            else:
+                return f"VALUES {graph_var} {{ $SV_GRAPH }}  GRAPH {graph_var} {{ {tmp} }} "
         return ""
 
     def _replace(self, query: str, query_params: dict):

@@ -229,6 +229,7 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
         args = {
             "$IN_SERVICE": self._in_service(),
             "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
+            "$SV_GRAPH": self._source.named_graphs.format_for_query(Profile.SV),
         }
         q = self._replace(self._query_meas_in_graph, args)
         res = self._source.query(q)
