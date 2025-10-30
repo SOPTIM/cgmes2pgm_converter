@@ -98,6 +98,8 @@ class Transformer2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
                 "_name": res["name1"][idx],
                 "_term1": res["_term1"][idx],
                 "_term2": res["_term2"][idx],
+                "_step1_rtc": res["step1"][idx],
+                "_step2_rtc": res["step2"][idx],
             }
 
         self._log_type_counts(extra_info)
