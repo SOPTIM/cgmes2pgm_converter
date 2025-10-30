@@ -34,7 +34,7 @@ class EquivalentBranchBuilder(LineBuilder):
         if self._source.split_profiles:
             named_graphs = self._source.named_graphs
             args = {
-                "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn"),
+                "$TOPO_ISLAND": self._at_topo_island_node_graph("?tn1", "?tn2"),
                 "$IN_SERVICE": self._in_service_graph("?line"),
                 "$TP_GRAPH": named_graphs.format_for_query(Profile.TP),
                 "$SSH_GRAPH": named_graphs.format_for_query(Profile.SSH),
