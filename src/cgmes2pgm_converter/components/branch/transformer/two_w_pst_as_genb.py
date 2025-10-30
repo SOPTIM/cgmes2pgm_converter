@@ -95,6 +95,12 @@ class Pst2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
                 "_name": res["name1"][idx],
                 "_term1": res["_term1"][idx],
                 "_term2": res["_term2"][idx],
+                "_step1_rtc": res["step1_rtc"][idx],
+                "_step2_rtc": res["step2_rtc"][idx],
+                "_step1_pst": res["step1"][idx],
+                "_step2_pst": res["step2"][idx],
+                "_pst_type1": res["taptype1"][idx],
+                "_pst_type2": res["taptype2"][idx],
             }
 
         self._log_type_counts(extra_info)

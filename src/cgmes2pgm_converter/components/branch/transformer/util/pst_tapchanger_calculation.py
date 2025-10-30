@@ -28,6 +28,15 @@ import pandas as pd
 deg_to_rad = np.pi / 180
 
 
+def unit_phasor_deg(angle_deg: float) -> complex:
+    angle_rad = angle_deg * deg_to_rad
+    return unit_phasor_rad(angle_rad)
+
+
+def unit_phasor_rad(angle_rad: float) -> complex:
+    return complex(np.cos(angle_rad), np.sin(angle_rad))
+
+
 def calc_theta_k_2w(
     trafo: pd.Series, tapside: int, tapside_rtc: int
 ) -> tuple[float, float]:
@@ -146,8 +155,6 @@ def calc_k_tabular_in_phase(
         steps_rtc,
     )
 
-    k = 1 / k
-
     return k
 
 
@@ -214,7 +221,7 @@ def _calc_theta_symmetrical(trafo, tapside):
     steps = steps_current - steps_neutral
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
 
-    # theta = 2.0 * np.arctan(0.5 * steps * voltage_increment/100)
+    # theta = 2.0 * np.arctan(0.5 * steps * voltage_increment / 100)
     # if tapside == 1:
     #     theta *= -1
 
@@ -226,15 +233,15 @@ def _calc_theta_symmetrical(trafo, tapside):
     w0 = (rated_u2_ / u_netz2) / (rated_u1_ / u_netz1)
     w0 = 1 / w0
 
-    angle = 90 * deg_to_rad
-    nenner_pst = 1 + ((steps / 100) * voltage_increment) * complex(
-        np.cos(angle), np.sin(angle)
-    )
-    t_pst = w0 / nenner_pst
+    t = w0
 
-    k = 1 / (abs(t_pst) * w0)
+    angle = 90
+    denominator_pst = 1 + ((voltage_increment / 100) * steps) * unit_phasor_deg(angle)
+    t_pst = 1 / denominator_pst
+    t = t * t_pst
 
-    theta = -np.angle(t_pst)
+    k = np.abs(t)
+    theta = -np.angle(t)
 
     #####
 
@@ -285,10 +292,24 @@ def _calc_theta_k_asymmetrical(trafo, tapside: int):
     voltage_increment = trafo[f"stepVoltageIncrement{tapside}"]
     winding_connection_angle = trafo[f"windingConnectionAngle{tapside}"]
 
-    u_netz1 = trafo["nomU1"]
-    u_netz2 = trafo["nomU2"]
-    u_rated1 = trafo["ratedU1"]
-    u_rated2 = trafo["ratedU2"]
+    nomU1 = trafo["nomU1"]
+    nomU2 = trafo["nomU2"]
+    ratedU1 = trafo["ratedU1"]
+    ratedU2 = trafo["ratedU2"]
+
+    regulated_side = tapside
+
+    if regulated_side == 2:
+        u_netz1 = nomU1
+        u_netz2 = nomU2
+        u_rated1 = ratedU1
+        u_rated2 = ratedU2
+        steps = -steps
+    else:
+        u_netz1 = nomU2
+        u_netz2 = nomU1
+        u_rated1 = ratedU2
+        u_rated2 = ratedU1
 
     theta, k = calc_theta_k_generic(
         rtc_tapside=0,
@@ -303,6 +324,9 @@ def _calc_theta_k_asymmetrical(trafo, tapside: int):
         u_netz1=u_netz1,
         u_netz2=u_netz2,
     )
+
+    k = 1 / k
+    theta *= -1
 
     #####
 
@@ -339,7 +363,7 @@ def _calc_theta_k_asymmetrical(trafo, tapside: int):
             )
         ],
     )
-    k1 = _calc_pp_ratio(_rated_hv, _rated_lv, u_netz1, u_netz2)
+    k1 = _calc_pp_ratio(_rated_hv, _rated_lv, nom_hv, nom_lv)
 
     #####
 
@@ -367,10 +391,26 @@ def calc_theta_k_asymmetrical_in_phase(
     steps_rtc = steps_current_rtc - steps_neutral_rtc
     voltage_increment_rtc = trafo[f"stepSize{tapside_rtc}"]
 
-    u_netz1 = trafo["nomU1"]
-    u_netz2 = trafo["nomU2"]
-    u_rated1 = trafo["ratedU1"]
-    u_rated2 = trafo["ratedU2"]
+    nomU1 = trafo["nomU1"]
+    nomU2 = trafo["nomU2"]
+    ratedU1 = trafo["ratedU1"]
+    ratedU2 = trafo["ratedU2"]
+
+    regulated_side = tapside_pst
+
+    if tapside_rtc != regulated_side:
+        steps_rtc = -steps_rtc
+
+    if regulated_side == 2:
+        u_netz1 = nomU1
+        u_netz2 = nomU2
+        u_rated1 = ratedU1
+        u_rated2 = ratedU2
+    else:
+        u_netz1 = nomU2
+        u_netz2 = nomU1
+        u_rated1 = ratedU2
+        u_rated2 = ratedU1
 
     theta, k = calc_theta_k_generic(
         rtc_tapside=tapside_rtc,
@@ -385,6 +425,9 @@ def calc_theta_k_asymmetrical_in_phase(
         u_netz1=u_netz1,
         u_netz2=u_netz2,
     )
+
+    k = 1 / k
+    theta *= -1
 
     #####
 
@@ -423,7 +466,7 @@ def calc_theta_k_asymmetrical_in_phase(
             ),
         ],
     )
-    k1 = _calc_pp_ratio(_rated_hv, _rated_lv, u_netz1, u_netz2)
+    k1 = _calc_pp_ratio(_rated_hv, _rated_lv, nom_hv, nom_lv)
     k1r = 1 / k1
 
     _rated_hv2, _rated_lv2, theta2 = _calc_pp_shift(
@@ -451,7 +494,7 @@ def calc_theta_k_asymmetrical_in_phase(
             ),
         ],
     )
-    k2 = _calc_pp_ratio(_rated_hv2, _rated_lv2, u_netz1, u_netz2)
+    k2 = _calc_pp_ratio(_rated_hv2, _rated_lv2, nom_hv, nom_lv)
     k2r = 1 / k2
 
     #####
@@ -474,45 +517,35 @@ def calc_theta_k_generic(
     u_netz1,
     u_netz2,
 ):
-    angle = winding_connection_angle * deg_to_rad
     w0 = (u_rated2 / u_netz2) / (u_rated1 / u_netz1)
+    w0 = 1 / w0
+
+    t = w0
 
     #
     # RTC
     #
-    if rtc_tapside == 0:
-        t_rtc = 1
-    else:
-
-        if rtc_tapside == pst_tapside:
-            rtc_step = -rtc_step
-
-        nenner_rtc = 1 + ((rtc_step / 100) * rtc_voltage_increment) * complex(
-            np.cos(0), np.sin(0)
-        )
-        t_rtc = w0 / nenner_rtc
-
-    w0 = w0 * abs(t_rtc)
-
-    ## TODO: dependent on rtc_tapside or pst_tapside?
-    w0 = 1 / w0
+    if rtc_tapside != 0:
+        denominator_rtc = 1 + (
+            (rtc_voltage_increment / 100) * rtc_step
+        ) * unit_phasor_deg(0)
+        t_rtc = 1 / denominator_rtc
+        t = t * t_rtc
 
     #
     # PST
     #
-    nenner_pst = 1 + ((pst_step / 100) * pst_voltage_increment) * complex(
-        np.cos(angle), np.sin(angle)
+    denominator_pst = 1 + ((pst_voltage_increment / 100) * pst_step) * unit_phasor_deg(
+        winding_connection_angle
     )
-    t_pst = w0 / nenner_pst
+    t_pst = 1 / denominator_pst
+
+    t = t * t_pst
 
     ## ----------------------
 
-    if rtc_tapside == 0:
-        k = abs(t_pst)
-        theta = np.angle(t_pst)
-    else:
-        k = 1 / abs(t_pst)
-        theta = -np.angle(t_pst)
+    k = abs(t)
+    theta = np.angle(t)
 
     return theta, k
 
@@ -533,7 +566,6 @@ def _calc_k_tabular(trafo):
         corr_u2_ *= tc_ratio2
 
     k = (corr_u1_ / corr_u2_) / nominal_ratio_
-    k = 1 / k
 
     return k
 
