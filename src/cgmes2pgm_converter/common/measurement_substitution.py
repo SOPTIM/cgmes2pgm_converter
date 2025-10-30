@@ -102,12 +102,14 @@ class LinkAsShortLineOptions:
     Attributes:
         enable (bool): Whether to use SSH values for substitution.
         sigma (float): The default sigma value for the substituted measurements (MW).
+        r (float): Resistance of the short line (Ohm).
+        x (float): Reactance of the short line (Ohm).
     """
 
     enable: bool = False
     sigma_factor: float = 1.5
-    r: float = 0.01
-    x: float = 0.01
+    r: float = 0.005
+    x: float = 0.030
 
 
 @dataclass
