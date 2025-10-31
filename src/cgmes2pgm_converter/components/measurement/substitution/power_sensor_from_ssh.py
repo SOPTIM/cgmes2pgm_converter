@@ -41,7 +41,6 @@ class SymPowerFromSshBuilder(AbstractPgmComponentBuilder):
         return _sensor_dict
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         sensor_dict = self._init_sensor_dict(input_data)
 
         sensor_list = PowerSensorList()
@@ -79,7 +78,6 @@ class SymPowerFromSshBuilder(AbstractPgmComponentBuilder):
         """
 
         for appliance in input_data[component_type]:
-
             appliance_id = appliance["id"]
             any_sensor = sensor_dict.get(appliance_id, [])
             if len(any_sensor) > 0:

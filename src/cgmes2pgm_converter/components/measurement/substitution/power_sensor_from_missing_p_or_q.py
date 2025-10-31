@@ -67,7 +67,6 @@ class SymPowerSensorIncompleteAppliance(AbstractPgmComponentBuilder):
         return self._is_active
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         self.update_incomplete_sensors(input_data)
 
         arr = initialize_array("input", ComponentType.sym_power_sensor, 0)
@@ -224,7 +223,6 @@ class SymPowerSensorIncompleteAppliance(AbstractPgmComponentBuilder):
         mtt: MeasuredTerminalType,
         _type: SymPowerType,
     ):
-
         # If there is only one branch (i.e. this branch) and otherwise only appliances are
         # connected to the node, then try to determine the missing measurement value
         # by looking at the balance of the appliances on the node.
@@ -436,7 +434,7 @@ class SymPowerSensorIncompleteAppliance(AbstractPgmComponentBuilder):
 
 
 def print_num(prop, val, val_zero):
-    return f"{prop}={val/1e6:10.3f} {is_zero(val_zero)}"
+    return f"{prop}={val / 1e6:10.3f} {is_zero(val_zero)}"
 
 
 def is_zero(val):

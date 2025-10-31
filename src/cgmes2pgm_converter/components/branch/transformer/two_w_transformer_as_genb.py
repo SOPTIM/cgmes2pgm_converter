@@ -23,7 +23,6 @@ from .abstract_two_2_transformer import Abstract2WTransformerBuilder
 
 
 class Transformer2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
-
     def is_active(self):
         return self._converter_options.use_generic_branch[BranchType.TRANSFORMER]
 

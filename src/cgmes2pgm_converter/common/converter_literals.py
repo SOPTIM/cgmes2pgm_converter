@@ -119,6 +119,5 @@ class SymPowerType(StrEnum):
 
 
 class NodeType(StrEnum):
-
     AUX_NODE = "Branch3-AuxiliaryNode"
     """Auxiliary node for branches with 3 terminals (e.g. 3W-Transformer)"""

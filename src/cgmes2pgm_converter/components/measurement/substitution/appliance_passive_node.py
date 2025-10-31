@@ -21,7 +21,6 @@ from ...component import AbstractPgmComponentBuilder
 
 
 class SymLoadOrGenForPassiveNodeBuilder(AbstractPgmComponentBuilder):
-
     def is_active(self):
         return self._converter_options.measurement_substitution.passive_nodes.enable
 
@@ -31,9 +30,7 @@ class SymLoadOrGenForPassiveNodeBuilder(AbstractPgmComponentBuilder):
             is None
         ):
             raise ValueError("Appliance type must be set")
-        return (
-            self._converter_options.measurement_substitution.passive_nodes.appliance_type
-        )
+        return self._converter_options.measurement_substitution.passive_nodes.appliance_type
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
         # find passive nodes
@@ -89,7 +86,5 @@ class SymLoadOrGenForPassiveNodeBuilder(AbstractPgmComponentBuilder):
         return has_no_appliances and has_branches and is_not_aux_node
 
     def get_type(self) -> str:
-        appliance_type = (
-            self._converter_options.measurement_substitution.passive_nodes.appliance_type
-        )
+        appliance_type = self._converter_options.measurement_substitution.passive_nodes.appliance_type
         return " Gen P" if appliance_type == ComponentType.sym_gen else " Load P"

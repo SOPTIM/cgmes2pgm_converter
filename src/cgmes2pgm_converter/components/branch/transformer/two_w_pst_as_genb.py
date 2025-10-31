@@ -22,7 +22,6 @@ from .util.pst_tapchanger_calculation import calc_theta_k_2w
 
 
 class Pst2WAsGenericBranchBuilder(Abstract2WTransformerBuilder):
-
     def is_active(self):
         return self._converter_options.use_generic_branch[BranchType.PST]
 

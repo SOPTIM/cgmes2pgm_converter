@@ -117,7 +117,6 @@ class SourceBuilder(AbstractPgmComponentBuilder):
         return not self._converter_options.sources_from_sv
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         pgm_id, _ = self.get_source()
 
         # Extract Row with source id

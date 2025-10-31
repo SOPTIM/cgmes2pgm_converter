@@ -113,7 +113,6 @@ class NamedGraphs:
                     self.graphs.pop(pi.profile)
 
     def determine_graph_name(self, profile: list[Profile], mas: list[str] = []) -> str:
-
         if len(profile) == 0:
             return self.default_graph
 
@@ -216,7 +215,6 @@ class CgmesDataset(SparqlDataSource):
 
         named_graphs = self.named_graphs
         for idx, item in dataset_profiles.iterrows():
-
             graph_name = item["graph"]
             profile_str = item["profile"]
             profile_info = Profile.parse(profile_str)
@@ -299,11 +297,9 @@ class CgmesDataset(SparqlDataSource):
             self._insert_df(df, profile_uri, include_mrid)
 
     def _insert_df(self, df: pd.DataFrame, graph: str, include_mrid):
-
         uris = [self.mrid_to_urn(row) for row in df[f"{CIM_ID_OBJ}.mRID"]]
         triples = []
         for col in df.columns:
-
             if col == f"{CIM_ID_OBJ}.mRID" and not include_mrid:
                 continue
 
@@ -354,7 +350,6 @@ class CgmesDataset(SparqlDataSource):
     def _insert_triples(
         self, triples: list[tuple[str, str, str]], profile: Profile | str
     ):
-
         profile_uris = self._get_profile_uri(profile)
         if len(profile_uris) == 0:
             raise ValueError(

@@ -30,7 +30,6 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class SymVoltageBuilder(AbstractPgmComponentBuilder):
-
     _query_meas_in_graph = """
         SELECT ?tn ?term ?u ?nom_u ?acc_u ?sigma_u ?name ?meas_u
         WHERE {
@@ -239,7 +238,9 @@ class SymVoltageBuilder(AbstractPgmComponentBuilder):
             )
         return meas_by_tn
 
-    def _get_one_measurement_and_sigma(self, meas_u, nom_u) -> tuple[
+    def _get_one_measurement_and_sigma(
+        self, meas_u, nom_u
+    ) -> tuple[
         float | None,
         float | None,
         str | None,

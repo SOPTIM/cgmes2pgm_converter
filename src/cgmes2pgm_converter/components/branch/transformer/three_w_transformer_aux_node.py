@@ -21,7 +21,6 @@ from .abstract_transformer import AbstractTransformerBuilder
 
 
 class Transformer3WAuxNodeBuilder(AbstractTransformerBuilder):
-
     def is_active(self):
         return self._converter_options.use_generic_branch[
             BranchType.THREE_WINDING_TRANSFORMER

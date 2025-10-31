@@ -66,7 +66,6 @@ class SymPowerSensorIncompleteBranch(AbstractPgmComponentBuilder):
         return self._is_active
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         self._init_sensor_dict(input_data)
 
         self.create_sensor(ComponentType.generic_branch, input_data)
@@ -88,7 +87,6 @@ class SymPowerSensorIncompleteBranch(AbstractPgmComponentBuilder):
         """
 
         for branch in input_data[component_type]:
-
             branch_id = branch["id"]
             sens = self._get_sensor_for_id(branch_id)
 

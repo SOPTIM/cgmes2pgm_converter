@@ -111,7 +111,6 @@ def calc_theta_k_3w(trafo, tapside, current_side):
 
 
 def _calc_theta_tabular(trafo, tapside):
-
     # --- Shift theta ---
     tc_angle1 = trafo["tcAngle1"]
     tc_angle2 = trafo["tcAngle2"]

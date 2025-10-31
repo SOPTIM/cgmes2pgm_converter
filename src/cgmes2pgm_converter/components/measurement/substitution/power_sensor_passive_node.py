@@ -21,7 +21,6 @@ from ...component import AbstractPgmComponentBuilder
 
 
 class SymPowerForPassiveNodeBuilder(AbstractPgmComponentBuilder):
-
     def is_active(self):
         return self._converter_options.measurement_substitution.passive_nodes.enable
 
@@ -66,9 +65,7 @@ class SymPowerForPassiveNodeBuilder(AbstractPgmComponentBuilder):
         return arr, extra_info
 
     def get_measured_terminal_type(self):
-        appliance_type = (
-            self._converter_options.measurement_substitution.passive_nodes.appliance_type
-        )
+        appliance_type = self._converter_options.measurement_substitution.passive_nodes.appliance_type
         if appliance_type == ComponentType.sym_gen:
             return MeasuredTerminalType.generator
         if appliance_type == ComponentType.sym_load:
