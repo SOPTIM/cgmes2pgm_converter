@@ -53,7 +53,6 @@ class Marker:
 
 
 class TopologySubnets:
-
     # node_id -> Marker
     def __init__(self):
         self._marker_dict: dict[int, Marker] = {}

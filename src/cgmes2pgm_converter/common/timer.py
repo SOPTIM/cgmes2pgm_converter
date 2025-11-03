@@ -17,7 +17,6 @@ import time
 
 
 class Timer:
-
     def __init__(self, name, loglevel=logging.DEBUG):
         self.name = name
         self.loglevel = loglevel

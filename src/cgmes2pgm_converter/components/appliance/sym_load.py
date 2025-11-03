@@ -21,7 +21,6 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class SymLoadBuilder(AbstractPgmComponentBuilder):
-
     _query = """
         SELECT DISTINCT ?topologicalNode ?name ?connected ?EnergyConsumer ?p ?q ?type ?terminal
         WHERE

@@ -21,14 +21,11 @@ from .abstract_transformer import AbstractTransformerBuilder
 
 
 class Abstract2WTransformerBuilder(AbstractTransformerBuilder):
-
     def winding_count(self) -> int:
         return 2
 
     def _validate_transformer_data(self, data: pd.DataFrame):
-
         for _, transformer in data.iterrows():
-
             # r, x, g, b, should be on side with TransformerEnd.endNumber=1
             if (transformer["r1"] == 0 and transformer["r2"] != 0) or (
                 transformer["x1"] == 0 and transformer["x2"] != 0

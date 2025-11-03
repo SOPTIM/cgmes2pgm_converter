@@ -71,7 +71,6 @@ class CgmesToPgmConverter(AbstractCgmesToPgmConverter):
             self._input_data[comp] = initialize_array("input", comp, 0)
 
     def convert(self) -> tuple[dict[ComponentType, np.ndarray], dict]:
-
         logging.debug("Starting conversion")
 
         builders = self._get_component_builders()

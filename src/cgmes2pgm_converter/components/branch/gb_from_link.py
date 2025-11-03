@@ -21,7 +21,6 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class GenericBranchFromLinkBuilder(AbstractPgmComponentBuilder):
-
     def __init__(
         self,
         cgmes_source: CgmesDataset,
@@ -35,7 +34,6 @@ class GenericBranchFromLinkBuilder(AbstractPgmComponentBuilder):
         return self._converter_options.link_as_short_line.enable
 
     def build_from_cgmes(self, input_data) -> tuple[np.ndarray, dict | None]:
-
         filtered_sensors = [
             s
             for s in input_data[ComponentType.sym_power_sensor]

@@ -21,7 +21,6 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
-
     def is_active(self):
         return (
             self._converter_options.measurement_substitution.imeas_used_for_qcalc.enable
@@ -132,7 +131,6 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
      """
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         # get all power sensors with the measured object id as key
         measured_objects_dict = {
             sensor["measured_object"]: sensor
@@ -180,7 +178,6 @@ class ReactivePowerForShuntBuilder(AbstractPgmComponentBuilder):
         )
 
         if shunt_with_i_without_q_meas:
-
             # create new IDs and names for the sensor
             sensor_iris = [
                 self._id_mapping.get_cgmes_iri(shunt) + "_Q"

@@ -23,7 +23,6 @@ from ...component import AbstractPgmComponentBuilder
 
 
 class AbstractTransformerBuilder(AbstractPgmComponentBuilder):
-
     _query = """
         SELECT ?tr ?name ?_term ?trEnd ?node ?b ?connectionType ?g ?r ?x ?_tratio ?_tstep ?ratedS ?ratedU ?nomU ?connected ?tapchanger ?highStep ?lowStep ?neutralStep ?neutralU ?normalStep ?step ?stepSize ?endNumber ?taptype ?topoIsland ?_ratiotap_type
         WHERE {

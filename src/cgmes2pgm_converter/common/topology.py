@@ -23,7 +23,6 @@ from .topology_subnets import TopologySubnets
 
 
 class Topology:
-
     def __init__(
         self,
         input_data: dict[ComponentType, np.ndarray],

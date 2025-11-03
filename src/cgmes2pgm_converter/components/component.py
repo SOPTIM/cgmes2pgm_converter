@@ -122,7 +122,6 @@ class AbstractPgmComponentBuilder(ABC):
     def _create_extra_info_with_type(
         self, arr: np.ndarray, type_: str, extra_info=None
     ) -> dict:
-
         if extra_info is None:
             # Cant be set as default value because it is mutable and
             # would be modified with each call

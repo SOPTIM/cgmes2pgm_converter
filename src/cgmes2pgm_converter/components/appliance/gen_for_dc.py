@@ -19,7 +19,6 @@ from ..component import AbstractPgmComponentBuilder
 
 
 class DcAsLoadBuilder(AbstractPgmComponentBuilder):
-
     _query = """
     SELECT DISTINCT ?name ?terminal ?topologicalNode ?connected ?converter ?type
             WHERE

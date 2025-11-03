@@ -27,7 +27,6 @@ IRI_SUFFIX = "_nomv_measurement"
 
 
 class VoltageSensorList:
-
     def __init__(self, use_nominal_voltages: UMeasurementSubstitutionOptions):
         self.id = []
         self.measured_object = []
@@ -53,14 +52,12 @@ class VoltageSensorList:
 
 
 class SymVoltageFromNominalVoltageBuilder(AbstractPgmComponentBuilder):
-
     def is_active(self) -> bool:
         return (
             self._converter_options.measurement_substitution.use_nominal_voltages.enable
         )
 
     def build_from_cgmes(self, input_data: dict) -> tuple[np.ndarray, dict | None]:
-
         sensor_list = VoltageSensorList(
             self._converter_options.measurement_substitution.use_nominal_voltages
         )

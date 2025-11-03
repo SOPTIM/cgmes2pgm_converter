@@ -517,7 +517,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
             elif eq_id in input_data[ComponentType.shunt]["id"]:
                 terminal_types[i] = MeasuredTerminalType.shunt
             elif eq_id in input_data[ComponentType.line]["id"]:
-
                 node_from = input_data[ComponentType.line]["from_node"][
                     input_data[ComponentType.line]["id"] == eq_id
                 ]
@@ -534,7 +533,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
                 eq_id in input_data[ComponentType.link]["id"]
                 and self._converter_options.link_as_short_line.enable
             ):
-
                 node_from = input_data[ComponentType.link]["from_node"][
                     input_data[ComponentType.link]["id"] == eq_id
                 ]
@@ -548,7 +546,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
                     terminal_types[i] = MeasuredTerminalType.branch_to
 
             elif eq_id in input_data[ComponentType.generic_branch]["id"]:
-
                 node_from = input_data[ComponentType.generic_branch]["from_node"][
                     input_data[ComponentType.generic_branch]["id"] == eq_id
                 ]
@@ -562,7 +559,6 @@ class SymPowerBuilder(AbstractPgmComponentBuilder):
                     terminal_types[i] = MeasuredTerminalType.branch_to
 
             elif eq_id in input_data[ComponentType.transformer]["id"]:
-
                 node_from = input_data[ComponentType.transformer]["from_node"][
                     input_data[ComponentType.transformer]["id"] == eq_id
                 ]

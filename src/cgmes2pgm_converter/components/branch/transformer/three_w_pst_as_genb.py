@@ -22,7 +22,6 @@ from .util.three_w_transformer_props import PstTransformerProps
 
 
 class Pst3WAsGenericBranchBuilder(AbstractTransformerBuilder):
-
     def is_active(self):
         return self._converter_options.use_generic_branch[BranchType.THREE_WINDING_PST]
 
@@ -46,7 +45,6 @@ class Pst3WAsGenericBranchBuilder(AbstractTransformerBuilder):
         props = PstTransformerProps(self.winding_count())
 
         for _, trafo in res.iterrows():
-
             u_node1 = trafo["nomU1"]
             u_node2 = trafo["nomU2"]
             u_node3 = trafo["nomU3"]

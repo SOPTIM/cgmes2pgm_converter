@@ -20,7 +20,6 @@ from SPARQLWrapper import SPARQLWrapper
 
 
 class AbstractSparqlDataSource:
-
     def __init__(self, base_url, prefixes: dict[str, str]):
         self._base_url = base_url
         self._prefixes = prefixes
@@ -36,7 +35,6 @@ class AbstractSparqlDataSource:
 
 
 class SparqlDataSource(AbstractSparqlDataSource):
-
     def __init__(
         self,
         base_url,

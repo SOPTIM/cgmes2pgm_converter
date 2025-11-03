@@ -115,7 +115,6 @@ class TransformerProps:
 
 
 class PstTransformerProps(TransformerProps):
-
     def __init__(self, winding_count):
         super().__init__(winding_count)
         self._type = "PST-" + str(winding_count) + "W"
