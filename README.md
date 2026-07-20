@@ -1,5 +1,6 @@
 # CGMES2PGM-Converter
 
+
 `cgmes2pgm_converter` provides a library to convert Common Grid Model Exchange Standard (CGMES) datasets to [PowerGridModel](https://github.com/PowerGridModel/power-grid-model) format.
 It was designed to apply the PGM State Estimation on a CGMES dataset.
 The CGMES dataset is fetched from a SPARQL endpoint and converted to a PGM dataset.
@@ -7,6 +8,18 @@ This converter works with CGMES 3.0 / CIM 100 datasets, as well as CGMES 2.4 / C
 
 Methods to substitute additional measurements are included as well to improve state estimation (e.g. passive nodes).
 [cgmes2pgm_suite](https://github.com/SOPTIM/cgmes2pgm_suite) provides additional tools for working with CGMES and PGM.
+
+## Project Status
+
+The SOPTIM PGM Converter is provided by SOPTIM AG.
+
+This repository is intentionally kept small and primarily serves demonstration, evaluation, and reproducibility purposes. 
+While SOPTIM AG actively develops solutions in the area of power system analysis and grid data integration, this repository is not intended to represent the full functionality, performance, or support offering of commercial SOPTIM products.
+
+The code is made available under the Apache-2.0 license. The availability of this repository does not imply any warranty, maintenance obligation, support commitment, or product roadmap by SOPTIM AG.
+
+For additional information please contact SOPTIM AG directly.
+
 
 ## Getting Started
 
