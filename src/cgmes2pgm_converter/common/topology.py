@@ -194,7 +194,6 @@ class Topology:
                 MeasuredTerminalType.source
                 | MeasuredTerminalType.generator
                 | MeasuredTerminalType.load
-                | MeasuredTerminalType.node
                 | MeasuredTerminalType.shunt
             ):
                 return "_sensor_p"

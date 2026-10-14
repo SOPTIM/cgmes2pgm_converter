@@ -241,7 +241,7 @@ class CgmesDataset(SparqlDataSource):
         if remove_uuid_base_uri:
             # Remove the base URI from all IRIs (if wanted) -> helps to keep the output clean
             prefix = self.base_url + "#"
-            for col in result.select_dtypes(include="object"):
+            for col in result.select_dtypes(include=["object", "str"]):
                 result[col] = result[col].str.replace(f"^{prefix}", "", regex=True)
         return result
 
